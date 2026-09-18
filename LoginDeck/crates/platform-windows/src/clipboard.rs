@@ -25,7 +25,7 @@ impl WindowsClipboard {
     pub fn new() -> Self {
         Self {
             #[cfg(target_os = "windows")]
-            worker: native::start_worker(),
+            worker: native::shared_worker(),
         }
     }
 }
@@ -52,10 +52,8 @@ impl Clipboard for WindowsClipboard {
             self.worker
                 .dispatch(native::Command::Write { value, reply })
                 .map_err(|_| unavailable())?;
-            return result
-                .await
-                .map_err(|_| unavailable())?
-                .map(WindowsClipboardChangeToken);
+            let published = result.await.map_err(|_| unavailable())??;
+            return Ok(WindowsClipboardChangeToken(published.claim()));
         }
 
         #[cfg(not(target_os = "windows"))]
@@ -91,7 +89,7 @@ fn unavailable() -> AppError {
 
 #[cfg(target_os = "windows")]
 mod native {
-    use std::{ptr, sync::Arc, sync::Mutex, thread, time::Duration};
+    use std::{ptr, sync::Arc, sync::OnceLock, thread, time::Duration};
 
     use autologin_core::AppError;
     use secrecy::{ExposeSecret, SecretString};
@@ -123,18 +121,19 @@ mod native {
     const OPEN_RETRY_DELAY: Duration = Duration::from_millis(5);
     const CF_UNICODETEXT_ID: u32 = CF_UNICODETEXT.0 as u32;
 
-    // Serialize LoginDeck's write and compare-and-clear operations. The guard is acquired only on
-    // a blocking worker and never crosses an await.
-    static CLIPBOARD_LOCK: Mutex<()> = Mutex::new(());
+    static SHARED_WORKER: OnceLock<WorkerSender> = OnceLock::new();
 
     pub(super) enum Command {
         Write {
             value: SecretString,
-            reply: tokio::sync::oneshot::Sender<Result<u32, AppError>>,
+            reply: tokio::sync::oneshot::Sender<Result<PublishedWrite, AppError>>,
         },
         Clear {
             expected: u32,
             reply: tokio::sync::oneshot::Sender<Result<(), AppError>>,
+        },
+        CleanupUnclaimed {
+            expected: u32,
         },
     }
 
@@ -154,34 +153,58 @@ mod native {
         }
     }
 
+    #[derive(Clone)]
     pub(super) struct WorkerSender {
-        sender: Option<std::sync::mpsc::Sender<Command>>,
+        sender: std::sync::mpsc::Sender<Command>,
         wake: Option<Arc<WakeEvent>>,
     }
 
     impl WorkerSender {
         pub(super) fn dispatch(&self, command: Command) -> Result<(), ()> {
-            self.sender
-                .as_ref()
-                .ok_or(())?
-                .send(command)
-                .map_err(|_| ())?;
+            self.sender.send(command).map_err(|_| ())?;
             let wake = self.wake.as_ref().ok_or(())?;
             unsafe { SetEvent(wake.handle()) }.map_err(|_| ())
         }
     }
 
-    impl Drop for WorkerSender {
+    /// A published sequence remains cleanup-owned until the awaiting future synchronously claims
+    /// it as the public token. Dropping it in a cancelled oneshot enqueues conditional cleanup.
+    pub(super) struct PublishedWrite {
+        sequence: u32,
+        worker: WorkerSender,
+        claimed: bool,
+    }
+
+    impl PublishedWrite {
+        fn new(sequence: u32, worker: WorkerSender) -> Self {
+            Self {
+                sequence,
+                worker,
+                claimed: false,
+            }
+        }
+
+        pub(super) fn claim(mut self) -> u32 {
+            self.claimed = true;
+            self.sequence
+        }
+    }
+
+    impl Drop for PublishedWrite {
         fn drop(&mut self) {
-            // Disconnect before signaling so the worker observes shutdown after draining commands.
-            self.sender.take();
-            if let Some(wake) = self.wake.as_ref() {
-                let _ = unsafe { SetEvent(wake.handle()) };
+            if !self.claimed {
+                let _ = self.worker.dispatch(Command::CleanupUnclaimed {
+                    expected: self.sequence,
+                });
             }
         }
     }
 
-    pub(super) fn start_worker() -> WorkerSender {
+    pub(super) fn shared_worker() -> WorkerSender {
+        SHARED_WORKER.get_or_init(start_worker).clone()
+    }
+
+    fn start_worker() -> WorkerSender {
         let (sender, receiver) = std::sync::mpsc::channel();
         let wake = unsafe { CreateEventW(None, false, false, None) }
             .ok()
@@ -189,14 +212,14 @@ mod native {
             .map(Arc::new);
         let Some(worker_wake) = wake.as_ref().map(Arc::clone) else {
             drop(receiver);
-            return WorkerSender {
-                sender: Some(sender),
-                wake: None,
-            };
+            return WorkerSender { sender, wake: None };
         };
+        let worker = WorkerSender { sender, wake };
+        let publication_worker = worker.clone();
         // The dedicated thread owns the HWND for its complete lifetime and performs every
-        // synchronous clipboard call. A spawn failure drops the receiver, so operations return
-        // the same bounded unavailable error through the disconnected channel.
+        // synchronous clipboard call for all WindowsClipboard instances. A spawn failure drops the
+        // receiver, so operations return the same unavailable error through the disconnected
+        // channel.
         let _ = thread::Builder::new()
             .name("logindeck-clipboard".to_owned())
             .spawn(move || {
@@ -210,14 +233,16 @@ mod native {
                                     let result = owner
                                         .as_ref()
                                         .map_err(|_| unavailable())
-                                        .and_then(|owner| write(owner.0, value));
-                                    if let Err(Ok(sequence)) = reply.send(result) {
-                                        // If the async caller was cancelled after dispatch, do not
-                                        // leave an untracked secret behind. The same sequence guard
-                                        // preserves a replacement that raced with this cleanup.
-                                        let _ =
-                                            clear_if_unchanged(owner.as_ref().unwrap().0, sequence);
-                                    }
+                                        .and_then(|owner| write(owner.0, value))
+                                        .map(|sequence| {
+                                            PublishedWrite::new(
+                                                sequence,
+                                                publication_worker.clone(),
+                                            )
+                                        });
+                                    // Failure before send and receiver cancellation after send both
+                                    // drop an unclaimed PublishedWrite and enqueue guarded cleanup.
+                                    let _ = reply.send(result);
                                 }
                                 Command::Clear { expected, reply } => {
                                     let result = owner
@@ -225,6 +250,11 @@ mod native {
                                         .map_err(|_| unavailable())
                                         .and_then(|owner| clear_if_unchanged(owner.0, expected));
                                     let _ = reply.send(result);
+                                }
+                                Command::CleanupUnclaimed { expected } => {
+                                    if let Ok(owner) = owner.as_ref() {
+                                        let _ = clear_if_unchanged(owner.0, expected);
+                                    }
                                 }
                             },
                             Err(std::sync::mpsc::TryRecvError::Empty) => break,
@@ -261,10 +291,7 @@ mod native {
                     }
                 }
             });
-        WorkerSender {
-            sender: Some(sender),
-            wake,
-        }
+        worker
     }
 
     struct OwnerWindow(HWND);
@@ -412,9 +439,6 @@ mod native {
     }
 
     fn write(owner: HWND, value: SecretString) -> Result<u32, AppError> {
-        let _serial = CLIPBOARD_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let wide = Zeroizing::new(
             value
                 .expose_secret()
@@ -451,10 +475,6 @@ mod native {
     }
 
     fn clear_if_unchanged(owner: HWND, expected: u32) -> Result<(), AppError> {
-        let _serial = CLIPBOARD_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-
         // First avoid opening or mutating the clipboard when a replacement is already visible.
         if unsafe { GetClipboardSequenceNumber() } != expected {
             return Ok(());

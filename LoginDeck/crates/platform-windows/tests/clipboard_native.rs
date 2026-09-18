@@ -1,6 +1,14 @@
 #![cfg(target_os = "windows")]
 
-use std::{ptr, slice, thread, time::Duration};
+use std::{
+    future::Future,
+    pin::Pin,
+    ptr, slice,
+    sync::Arc,
+    task::{Context, Poll, Wake, Waker},
+    thread,
+    time::{Duration, Instant},
+};
 
 use autologin_core::Clipboard;
 use platform_windows::WindowsClipboard;
@@ -11,8 +19,9 @@ use windows::{
         Foundation::{CloseHandle, HANDLE, HGLOBAL, HWND, WAIT_ABANDONED, WAIT_OBJECT_0},
         System::{
             DataExchange::{
-                CloseClipboard, EmptyClipboard, GetClipboardData, GetClipboardSequenceNumber,
-                IsClipboardFormatAvailable, OpenClipboard, SetClipboardData,
+                CloseClipboard, CountClipboardFormats, EmptyClipboard, GetClipboardData,
+                GetClipboardOwner, GetClipboardSequenceNumber, IsClipboardFormatAvailable,
+                OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
             },
             Memory::{GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE},
             Ole::CF_UNICODETEXT,
@@ -80,13 +89,15 @@ impl Drop for OwnerWindow {
     }
 }
 
-struct OpenClipboardGuard;
+struct OpenClipboardGuard {
+    open: bool,
+}
 
 impl OpenClipboardGuard {
     fn open(owner: Option<HWND>) -> windows::core::Result<Self> {
         for attempt in 0..OPEN_ATTEMPTS {
             if unsafe { OpenClipboard(owner) }.is_ok() {
-                return Ok(Self);
+                return Ok(Self { open: true });
             }
             if attempt + 1 < OPEN_ATTEMPTS {
                 thread::sleep(Duration::from_millis(5));
@@ -94,31 +105,34 @@ impl OpenClipboardGuard {
         }
         Err(windows::core::Error::from_win32())
     }
+
+    fn close(mut self) -> windows::core::Result<()> {
+        unsafe { CloseClipboard() }?;
+        self.open = false;
+        Ok(())
+    }
 }
 
 impl Drop for OpenClipboardGuard {
     fn drop(&mut self) {
-        let _ = unsafe { CloseClipboard() };
+        if self.open {
+            let _ = unsafe { CloseClipboard() };
+        }
     }
 }
 
 struct OwnedGlobal(Option<HGLOBAL>);
 
 impl OwnedGlobal {
-    fn unicode(value: &str) -> windows::core::Result<Self> {
-        let wide: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
-        let byte_len = wide
-            .len()
-            .checked_mul(size_of::<u16>())
-            .ok_or_else(windows::core::Error::from_win32)?;
-        let memory = unsafe { GlobalAlloc(GMEM_MOVEABLE, byte_len) }?;
+    fn bytes(value: &[u8]) -> windows::core::Result<Self> {
+        let memory = unsafe { GlobalAlloc(GMEM_MOVEABLE, value.len()) }?;
         let owned = Self(Some(memory));
         let destination = unsafe { GlobalLock(memory) };
         if destination.is_null() {
             return Err(windows::core::Error::from_win32());
         }
         unsafe {
-            ptr::copy_nonoverlapping(wide.as_ptr().cast::<u8>(), destination.cast(), byte_len);
+            ptr::copy_nonoverlapping(value.as_ptr(), destination.cast(), value.len());
             // A successful final unlock returns zero by design; only the lock's non-null result is
             // required for this single-lock allocation.
             let _ = GlobalUnlock(memory);
@@ -145,17 +159,57 @@ impl Drop for OwnedGlobal {
 
 fn set_unicode_while_open(value: &str) -> windows::core::Result<()> {
     unsafe { EmptyClipboard() }?;
-    let memory = OwnedGlobal::unicode(value)?;
+    let wide: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
+    let bytes =
+        unsafe { slice::from_raw_parts(wide.as_ptr().cast::<u8>(), wide.len() * size_of::<u16>()) };
+    let memory = OwnedGlobal::bytes(bytes)?;
     unsafe { SetClipboardData(CF_UNICODETEXT_ID, Some(memory.handle())) }?;
     memory.transfer();
     Ok(())
 }
 
-fn native_write(value: &str) -> windows::core::Result<u32> {
-    let owner = OwnerWindow::create()?;
-    let _open = OpenClipboardGuard::open(Some(owner.0))?;
-    set_unicode_while_open(value)?;
-    Ok(unsafe { GetClipboardSequenceNumber() })
+fn set_format_while_open(format: u32, value: &[u8]) -> windows::core::Result<()> {
+    unsafe { EmptyClipboard() }?;
+    let memory = OwnedGlobal::bytes(value)?;
+    unsafe { SetClipboardData(format, Some(memory.handle())) }?;
+    memory.transfer();
+    Ok(())
+}
+
+struct OwnedTestMutation {
+    owner: OwnerWindow,
+    sequence: u32,
+}
+
+impl OwnedTestMutation {
+    fn apply(mutate: impl FnOnce() -> windows::core::Result<()>) -> windows::core::Result<Self> {
+        let owner = OwnerWindow::create()?;
+        let open = OpenClipboardGuard::open(Some(owner.0))?;
+        mutate()?;
+        open.close()?;
+        let sequence = unsafe { GetClipboardSequenceNumber() };
+        let observed_owner = unsafe { GetClipboardOwner() }?;
+        if observed_owner != owner.0 {
+            return Err(windows::core::Error::from_win32());
+        }
+        Ok(Self { owner, sequence })
+    }
+
+    fn unicode(value: &str) -> windows::core::Result<Self> {
+        Self::apply(|| set_unicode_while_open(value))
+    }
+
+    fn empty() -> windows::core::Result<Self> {
+        Self::apply(|| unsafe { EmptyClipboard() })
+    }
+
+    fn non_text(format: u32, value: &[u8]) -> windows::core::Result<Self> {
+        Self::apply(|| set_format_while_open(format, value))
+    }
+}
+
+fn native_write(value: &str) -> windows::core::Result<OwnedTestMutation> {
+    OwnedTestMutation::unicode(value)
 }
 
 fn read_unicode_while_open() -> windows::core::Result<Option<SecretString>> {
@@ -183,60 +237,69 @@ fn read_unicode_while_open() -> windows::core::Result<Option<SecretString>> {
     result.map(Some)
 }
 
-fn inspect_unicode() -> windows::core::Result<(Option<SecretString>, u32)> {
+fn inspect_unicode() -> windows::core::Result<Option<SecretString>> {
     let _open = OpenClipboardGuard::open(None)?;
-    let value = read_unicode_while_open()?;
-    let sequence = unsafe { GetClipboardSequenceNumber() };
-    Ok((value, sequence))
+    read_unicode_while_open()
+}
+
+fn format_available(format: u32) -> windows::core::Result<bool> {
+    let _open = OpenClipboardGuard::open(None)?;
+    Ok(unsafe { IsClipboardFormatAvailable(format) }.is_ok())
+}
+
+fn non_text_format() -> u32 {
+    let format = unsafe { RegisterClipboardFormatW(w!("LoginDeck.Tests.ImageLike")) };
+    assert!(format != 0, "test clipboard format registration failed");
+    format
 }
 
 struct ClipboardSnapshot {
     original: Option<SecretString>,
-    last_fixture_sequence: Option<u32>,
+    owned_mutation: Option<OwnedTestMutation>,
 }
 
 impl ClipboardSnapshot {
     fn capture() -> Self {
-        let (original, _) = inspect_unicode().expect("clipboard snapshot must be readable");
+        let original = inspect_unicode().expect("clipboard snapshot must be readable");
         Self {
             original,
-            last_fixture_sequence: None,
+            owned_mutation: None,
         }
     }
 
-    fn expect_exact(&mut self, expected: &str) {
-        let (actual, sequence) = inspect_unicode().expect("clipboard fixture must be readable");
+    fn expect_exact(&self, expected: &str) {
+        let actual = inspect_unicode().expect("clipboard fixture must be readable");
         assert!(
             actual
                 .as_ref()
                 .is_some_and(|value| value.expose_secret() == expected),
             "clipboard did not contain the expected fixture"
         );
-        self.last_fixture_sequence = Some(sequence);
     }
 
-    fn expect_empty(&mut self) {
-        let (actual, sequence) = inspect_unicode().expect("clipboard fixture must be readable");
+    fn expect_empty(&self) {
+        let _open = OpenClipboardGuard::open(None).expect("clipboard must be readable");
         assert!(
-            actual.is_none(),
-            "Unicode clipboard data remained available"
+            unsafe { CountClipboardFormats() } == 0,
+            "clipboard still contains one or more formats"
         );
-        self.last_fixture_sequence = Some(sequence);
+    }
+
+    fn claim(&mut self, mutation: OwnedTestMutation) {
+        self.owned_mutation = Some(mutation);
     }
 }
 
 impl Drop for ClipboardSnapshot {
     fn drop(&mut self) {
-        let Some(expected) = self.last_fixture_sequence else {
+        let Some(mutation) = self.owned_mutation.as_ref() else {
             return;
         };
+        let expected = mutation.sequence;
         if unsafe { GetClipboardSequenceNumber() } != expected {
             return;
         }
-        let Ok(owner) = OwnerWindow::create() else {
-            return;
-        };
-        let Ok(_open) = OpenClipboardGuard::open(Some(owner.0)) else {
+        let Ok(_open) = OpenClipboardGuard::open(Some(mutation.owner.0)) else {
             return;
         };
         if unsafe { GetClipboardSequenceNumber() } != expected {
@@ -253,6 +316,17 @@ impl Drop for ClipboardSnapshot {
     }
 }
 
+struct NoWake;
+
+impl Wake for NoWake {
+    fn wake(self: Arc<Self>) {}
+}
+
+fn poll_once<F: Future>(future: Pin<&mut F>) -> Poll<F::Output> {
+    let waker = Waker::from(Arc::new(NoWake));
+    future.poll(&mut Context::from_waker(&waker))
+}
+
 fn secret(value: &str) -> SecretString {
     SecretString::from(value.to_owned())
 }
@@ -260,7 +334,7 @@ fn secret(value: &str) -> SecretString {
 #[tokio::test]
 async fn own_unchanged_write_can_be_cleared() {
     let _process = ProcessTestLock::acquire();
-    let mut snapshot = ClipboardSnapshot::capture();
+    let snapshot = ClipboardSnapshot::capture();
     let clipboard = WindowsClipboard::new();
 
     let token = clipboard.write(secret("LoginDeck fixture")).await.unwrap();
@@ -279,11 +353,12 @@ async fn replacement_by_an_independent_native_writer_is_preserved() {
     let clipboard = WindowsClipboard::new();
 
     let token = clipboard.write(secret("LoginDeck old")).await.unwrap();
-    native_write("user replacement").expect("independent write must succeed");
+    let replacement = native_write("user replacement").expect("independent write must succeed");
     snapshot.expect_exact("user replacement");
     clipboard.clear_if_unchanged(&token).await.unwrap();
 
     snapshot.expect_exact("user replacement");
+    snapshot.claim(replacement);
     drop(snapshot);
     drop(clipboard);
 }
@@ -291,7 +366,7 @@ async fn replacement_by_an_independent_native_writer_is_preserved() {
 #[tokio::test]
 async fn first_of_two_logindeck_tokens_cannot_clear_the_second_write() {
     let _process = ProcessTestLock::acquire();
-    let mut snapshot = ClipboardSnapshot::capture();
+    let snapshot = ClipboardSnapshot::capture();
     let clipboard = WindowsClipboard::new();
 
     let first = clipboard.write(secret("LoginDeck first")).await.unwrap();
@@ -309,7 +384,7 @@ async fn first_of_two_logindeck_tokens_cannot_clear_the_second_write() {
 async fn embedded_nul_is_rejected_before_clipboard_mutation() {
     let _process = ProcessTestLock::acquire();
     let mut snapshot = ClipboardSnapshot::capture();
-    native_write("unchanged marker").expect("marker write must succeed");
+    let marker = native_write("unchanged marker").expect("marker write must succeed");
     snapshot.expect_exact("unchanged marker");
     let clipboard = WindowsClipboard::new();
 
@@ -324,6 +399,158 @@ async fn embedded_nul_is_rejected_before_clipboard_mutation() {
         Some("password")
     );
     snapshot.expect_exact("unchanged marker");
+    snapshot.claim(marker);
     drop(snapshot);
     drop(clipboard);
+}
+
+#[test]
+fn teardown_does_not_overwrite_a_later_non_text_mutation() {
+    let _process = ProcessTestLock::acquire();
+    let mut restore_user_clipboard = ClipboardSnapshot::capture();
+    let mut subject = ClipboardSnapshot::capture();
+    subject.claim(
+        OwnedTestMutation::unicode("LoginDeck owned mutation")
+            .expect("owned fixture write must succeed"),
+    );
+
+    let format = non_text_format();
+    let replacement = OwnedTestMutation::non_text(format, b"image-like-test-bytes")
+        .expect("non-text replacement must succeed");
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| subject.expect_empty())).is_err(),
+        "non-text clipboard content was incorrectly treated as empty"
+    );
+    drop(subject);
+
+    assert!(
+        format_available(format).expect("format check must succeed"),
+        "teardown overwrote a later non-text clipboard mutation"
+    );
+    restore_user_clipboard.claim(replacement);
+    drop(restore_user_clipboard);
+}
+
+#[test]
+fn teardown_does_not_adopt_identical_text_from_a_later_writer() {
+    let _process = ProcessTestLock::acquire();
+    let mut restore_user_clipboard = ClipboardSnapshot::capture();
+    let baseline =
+        OwnedTestMutation::unicode("subject original").expect("subject baseline must succeed");
+    let mut subject = ClipboardSnapshot::capture();
+    subject.claim(
+        OwnedTestMutation::unicode("identical replacement")
+            .expect("owned fixture write must succeed"),
+    );
+
+    let replacement = OwnedTestMutation::unicode("identical replacement")
+        .expect("later identical write must succeed");
+    drop(subject);
+
+    ClipboardSnapshot::capture().expect_exact("identical replacement");
+    restore_user_clipboard.claim(replacement);
+    drop(restore_user_clipboard);
+    drop(baseline);
+}
+
+#[tokio::test]
+async fn cancellation_before_publication_cleans_the_unclaimed_write() {
+    let _process = ProcessTestLock::acquire();
+    let snapshot = ClipboardSnapshot::capture();
+    let clipboard = WindowsClipboard::new();
+    let stale = clipboard.write(secret("stale token")).await.unwrap();
+    drop(OwnedTestMutation::empty().expect("empty baseline must succeed"));
+
+    let owner = OwnerWindow::create().expect("blocking owner must be created");
+    let held = OpenClipboardGuard::open(Some(owner.0)).expect("clipboard hold must succeed");
+    let mut cancelled = Box::pin(clipboard.write(secret("cancel before publication")));
+    assert!(matches!(poll_once(cancelled.as_mut()), Poll::Pending));
+    drop(cancelled);
+    drop(held);
+    drop(owner);
+
+    // Two FIFO barriers cover either ordering between the already-queued barrier and the cleanup
+    // command created when publication discovers that its receiver was cancelled.
+    clipboard.clear_if_unchanged(&stale).await.unwrap();
+    clipboard.clear_if_unchanged(&stale).await.unwrap();
+    snapshot.expect_empty();
+    drop(snapshot);
+    drop(clipboard);
+}
+
+#[tokio::test]
+async fn cancellation_after_successful_result_send_cleans_the_unclaimed_write() {
+    let _process = ProcessTestLock::acquire();
+    let snapshot = ClipboardSnapshot::capture();
+    let clipboard = WindowsClipboard::new();
+    let stale = clipboard.write(secret("stale token")).await.unwrap();
+    let mut cancelled = Box::pin(clipboard.write(secret("cancel after send")));
+    assert!(matches!(poll_once(cancelled.as_mut()), Poll::Pending));
+
+    // Same-worker FIFO completion proves the prior write command has published its result into the
+    // still-unpolled oneshot receiver.
+    clipboard.clear_if_unchanged(&stale).await.unwrap();
+    snapshot.expect_exact("cancel after send");
+    drop(cancelled);
+    clipboard.clear_if_unchanged(&stale).await.unwrap();
+
+    snapshot.expect_empty();
+    drop(snapshot);
+    drop(clipboard);
+}
+
+#[tokio::test]
+async fn cancelled_published_write_preserves_a_later_replacement() {
+    let _process = ProcessTestLock::acquire();
+    let mut snapshot = ClipboardSnapshot::capture();
+    let clipboard = WindowsClipboard::new();
+    let stale = clipboard.write(secret("stale token")).await.unwrap();
+    let mut cancelled = Box::pin(clipboard.write(secret("unclaimed password")));
+    assert!(matches!(poll_once(cancelled.as_mut()), Poll::Pending));
+    clipboard.clear_if_unchanged(&stale).await.unwrap();
+
+    let replacement =
+        native_write("user replacement after publish").expect("replacement must succeed");
+    drop(cancelled);
+    clipboard.clear_if_unchanged(&stale).await.unwrap();
+
+    snapshot.expect_exact("user replacement after publish");
+    snapshot.claim(replacement);
+    drop(snapshot);
+    drop(clipboard);
+}
+
+#[tokio::test]
+async fn two_instances_serialize_without_blocking_the_owner_message_pump() {
+    let _process = ProcessTestLock::acquire();
+    let snapshot = ClipboardSnapshot::capture();
+    let first = WindowsClipboard::new();
+    let second = WindowsClipboard::new();
+    let _owner_token = first.write(secret("first owner")).await.unwrap();
+
+    let owner = OwnerWindow::create().expect("blocking owner must be created");
+    let held = OpenClipboardGuard::open(Some(owner.0)).expect("clipboard hold must succeed");
+    let mut second_write = Box::pin(second.write(secret("second instance")));
+    assert!(matches!(poll_once(second_write.as_mut()), Poll::Pending));
+    thread::sleep(Duration::from_millis(8));
+    let mut first_write = Box::pin(first.write(secret("first instance final")));
+    assert!(matches!(poll_once(first_write.as_mut()), Poll::Pending));
+
+    let started = Instant::now();
+    drop(held);
+    drop(owner);
+    let second_token = second_write.await.unwrap();
+    let first_token = first_write.await.unwrap();
+    assert!(
+        started.elapsed() < Duration::from_secs(4),
+        "owner message pumping was blocked across clipboard instances"
+    );
+
+    second.clear_if_unchanged(&second_token).await.unwrap();
+    snapshot.expect_exact("first instance final");
+    first.clear_if_unchanged(&first_token).await.unwrap();
+    snapshot.expect_empty();
+    drop(snapshot);
+    drop(first);
+    drop(second);
 }

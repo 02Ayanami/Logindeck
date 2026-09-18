@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "id": "qq-macos",
+  "revision": 1,
+  "platform": "macos",
+  "bundle_id": "com.tencent.qq",
+  "states": [
+    {
+      "id": "password_login",
+      "kind": "password_login",
+      "controls": {
+        "username": {
+          "role": "text_field",
+          "names": [
+            "输入QQ号"
+          ],
+          "ancestor": {
+            "role": "web_area"
+          }
+        },
+        "password": {
+          "role": "secure_text_field",
+          "names": [
+            "输入QQ密码"
+          ],
+          "ancestor": {
+            "role": "web_area"
+          }
+        },
+        "submit": {
+          "role": "button",
+          "names": [
+            "登录"
+          ],
+          "ancestor": {
+            "role": "web_area"
+          }
+        }
+      },
+      "actions": [
+        {
+          "type": "fill",
+          "field": "username"
+        },
+        {
+          "type": "fill",
+          "field": "password"
+        }
+      ]
+    },
+    {
+      "id": "choose_password_login",
+      "kind": "manual",
+      "controls": {
+        "marker": {
+          "role": "button",
+          "names": [
+            "账密登录"
+          ],
+          "ancestor": {
+            "role": "web_area"
+          }
+        }
+      },
+      "actions": [
+        {
+          "type": "request_user"
+        }
+      ]
+    }
+  ]
+}

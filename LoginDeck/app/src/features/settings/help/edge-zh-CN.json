@@ -1,0 +1,29 @@
+{
+  "install": {
+    "title": "安装 Edge 扩展",
+    "back": "返回插件说明",
+    "intro": "无需终端命令。应用会自动准备扩展和本机连接组件，你只需在 Edge 中完成确认。",
+    "prepareTitle": "1. 自动准备安装文件",
+    "preparing": "正在配置本机连接组件、准备扩展文件…",
+    "prepared": "已准备好。本机连接组件已配置，接下来在 Edge 加载扩展。",
+    "notPrepared": "安装文件尚未准备好。",
+    "retry": "重试准备",
+    "edgeTitle": "2. 在 Edge 加载扩展",
+    "edgeStep": "点击下方按钮打开 Edge，开启左下角“开发人员模式”，再点击“加载解压缩的扩展”。",
+    "openEdge": "打开 Edge 扩展管理",
+    "folderStep": "点击“显示扩展文件夹”，访达会选中 edge-extension 文件夹。在 Edge 的文件夹选择窗口中选择这个文件夹。",
+    "openFolder": "显示扩展文件夹",
+    "pathLabel": "扩展文件夹路径",
+    "pathTip": "找不到文件夹？复制上面的路径，在 Edge 的文件夹选择窗口按 Command + Shift + G，粘贴路径并回车，再确认选择。",
+    "developerAlt": "开启 Edge 开发人员模式",
+    "loadAlt": "点击加载解压缩的扩展",
+    "finishTitle": "3. 检测连接",
+    "finishStep": "保持 LoginDeck 运行，将插件固定到 Edge 工具栏，点击“检测连接”。连接成功后，提交网页登录表单即可看到保存提示，确认保存后由 LoginDeck 添加账号或更新密码。",
+    "updateTip": "已安装过此扩展？重新准备文件后，在 Edge 点击 LoginDeck 的“重新加载”。如果旧版扩展来自项目文件夹，请改为加载上面的稳定文件夹。",
+    "finish": "完成",
+    "failed": "准备或打开操作失败，请重试。若仍失败，请检查当前用户目录是否可写。",
+    "conflict": "检测到不同的连接配置或未完成的安装文件，已停止覆盖。请联系维护者检查后重试。",
+    "missing": "此应用缺少安装资源，请使用完整的 LoginDeck 安装包。",
+    "edgeMissing": "未能打开 Microsoft Edge。请确认已安装 Edge，也可以手动在地址栏输入 edge://extensions。"
+  }
+}

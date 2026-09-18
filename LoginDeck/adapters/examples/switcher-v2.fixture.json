@@ -1,0 +1,34 @@
+{
+  "schema_version": 3,
+  "id": "demo-macos",
+  "platform": "macos",
+  "application_id": "org.example.demo",
+  "states": {
+    "home": {"kind": "logged_in", "controls": {"account_menu": {"role": "button", "names": ["Account menu"]}}},
+    "menu": {"kind": "intermediate", "controls": {"logout": {"role": "menu_item", "names": ["Sign out"], "ancestor": {"role": "menu"}}}},
+    "password": {"kind": "login_page", "controls": {
+      "username": {"role": "text_field", "identifier": "login-user"},
+      "password": {"role": "secure_text_field", "identifier": "login-secret"},
+      "submit": {"role": "button", "names": ["Sign in"]}
+    }},
+    "verification": {"kind": "challenge", "controls": {"message": {"role": "static_text", "names": ["Approve on your device"]}}}
+  },
+  "flows": {
+    "logout": {"kind": "logout", "timeout_ms": 30000, "outcome": "logged_out", "steps": [
+      {"type": "click", "state": "home", "target": "account_menu", "next_states": ["menu"]},
+      {"type": "click", "state": "menu", "target": "logout", "next_states": ["password"]},
+      {"type": "wait_state", "state": "password"}
+    ]},
+    "fill": {"kind": "login", "timeout_ms": 30000, "outcome": "filled", "steps": [
+      {"type": "fill", "state": "password", "target": "username", "field": "username"},
+      {"type": "fill", "state": "password", "target": "password", "field": "password"}
+    ]},
+    "login": {"kind": "login", "timeout_ms": 120000, "outcome": "logged_in_observed", "steps": [
+      {"type": "fill", "state": "password", "target": "username", "field": "username"},
+      {"type": "fill", "state": "password", "target": "password", "field": "password"},
+      {"type": "submit", "state": "password", "target": "submit", "next_states": ["verification"]},
+      {"type": "challenge", "state": "verification", "resume_state": "home"},
+      {"type": "wait_state", "state": "home"}
+    ]}
+  }
+}

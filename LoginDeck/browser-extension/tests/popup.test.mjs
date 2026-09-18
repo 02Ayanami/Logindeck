@@ -1,0 +1,23 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { readFile } from 'node:fs/promises';
+import { setTimeout as pause } from 'node:timers/promises';
+const require = createRequire(new URL('../../app/package.json', import.meta.url));
+const { JSDOM } = require('jsdom');
+test('toolbar popup only checks connection and follows the desktop language', async () => {
+  const dom = new JSDOM(await readFile(new URL('../src/popup.html', import.meta.url), 'utf8'));
+  globalThis.document = dom.window.document;
+  let resolve;
+  globalThis.chrome = { runtime: { sendMessage: () => new Promise(done => { resolve = done; }) } };
+  await import('../src/popup.js?connection');
+  const button = document.getElementById('check');
+  assert.equal(button.disabled, true);
+  resolve({ connected: true, locale: 'zh-CN' }); await pause(0);
+  assert.equal(document.getElementById('connection').textContent, '已连接 LoginDeck');
+  assert.equal(button.textContent, '检测连接');
+  assert.equal(document.querySelectorAll('button').length, 1);
+  button.click(); resolve({ connected: false, locale: 'zh-CN' }); await pause(0);
+  assert.match(document.getElementById('connection').textContent, /保持 LoginDeck 运行/);
+  dom.window.close(); delete globalThis.document; delete globalThis.chrome;
+});

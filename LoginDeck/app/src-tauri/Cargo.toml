@@ -1,0 +1,33 @@
+[package]
+name = "autologin-desktop"
+version = "0.1.0"
+description = "LoginDeck desktop application"
+authors = ["LoginDeck"]
+edition = "2021"
+rust-version = "1.89"
+
+[lib]
+name = "autologin_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "autologin-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+autologin-core = { path = "../../crates/autologin-core" }
+platform-runtime = { path = "../../crates/platform-runtime" }
+async-trait = "0.1"
+secrecy = "0.10"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["rt", "time", "macros", "sync"] }
+
+serde_json = "1"
+
+[dev-dependencies]

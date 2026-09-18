@@ -1,0 +1,8 @@
+{
+  "registered": [
+    {"path":"/Applications/Chat.app","display_name":"Chat","bundle_id":"com.example.Chat","signature_identity":"designated-chat"}
+  ],
+  "scanned": [
+    {"path":"/Applications/ZChat.app","display_name":"Chat","bundle_id":"com.example.Chat","signature_identity":"designated-chat"}
+  ]
+}

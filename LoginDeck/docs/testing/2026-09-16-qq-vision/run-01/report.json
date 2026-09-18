@@ -1,0 +1,23 @@
+{
+  "started_at": "2026-09-16T09:21:46.910270+00:00",
+  "model": "gemini-3.6-flash",
+  "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+  "synthetic_only": false,
+  "provider": "google",
+  "enable_thinking": "model_default",
+  "explicit_image_dimensions": true,
+  "request_count": 1,
+  "format_attempts": [],
+  "message": "测试完成：0 项通过，0 项未通过，1 项未完成验证。真实 QQ 兼容性仍需另测。",
+  "results": [
+    {
+      "passed": false,
+      "reason": "请求超时或网络连接失败，此项尚未验证",
+      "inconclusive": true,
+      "id": "qq-empty-login",
+      "title": "QQ 空白账号密码登录页",
+      "seconds": 5.01,
+      "mode": "json_schema"
+    }
+  ]
+}

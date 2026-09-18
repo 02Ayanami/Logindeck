@@ -1,0 +1,44 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+function event() { const listeners = []; return { addListener: fn => listeners.push(fn), fire: (...args) => listeners.forEach(fn => fn(...args)) }; }
+test('credentials stay in the worker until consent; rejects wrong tabs and clears dismissed candidates', async () => {
+  const onMessage = event(), hostMessage = event(), disconnect = event(), sent = [];
+  let enabled = true;
+  const port = { onMessage: hostMessage, onDisconnect: disconnect, postMessage(value) {
+    sent.push(structuredClone(value));
+    queueMicrotask(() => hostMessage.fire({ version: 1, requestId: value.requestId, ...(value.body.type === 'status.get' ? { type: 'status', enabled, revision: 1, uiLocale: 'zh-CN' } : { type: 'account.saved', action: 'created_account', websiteName: 'Example', accountDisplayName: '账号 1' }) }));
+  } };
+  globalThis.chrome = { runtime: { id: 'abc', onMessage, onInstalled: event(), onStartup: event(), connectNative: () => port }, tabs: { onRemoved: event() }, scripting: { unregisterContentScripts: async () => {}, registerContentScripts: async () => {} } };
+  await import('../src/background.js?consent');
+  const sender = { id: 'abc', frameId: 0, url: 'https://example.invalid/login', tab: { id: 1, url: 'https://example.invalid/login' } };
+  const send = (message, from = sender) => new Promise(resolve => onMessage.fire(message, from, resolve));
+  assert.equal((await send({ type: 'capture.status' })).enabled, true);
+  const pending = await send({ type: 'login.candidate', origin: 'https://example.invalid', username: 'alice', password: 'fixture', revision: 1 });
+  assert.equal(pending.candidate.phase, 'pending');
+  assert(pending.candidate.expires - Date.now() <= 15000);
+  assert.equal(sent.filter(value => value.body.type === 'account.save').length, 0);
+  assert(!JSON.stringify(pending).includes('fixture'));
+  await send({ type: 'capture.confirm', candidateId: pending.candidate.id }, { ...sender, tab: { ...sender.tab, id: 2 } });
+  assert.equal(sent.filter(value => value.body.type === 'account.save').length, 0);
+  await send({ type: 'capture.confirm', candidateId: pending.candidate.id }, { ...sender, url: 'https://other.invalid', tab: { id: 1, url: 'https://other.invalid' } });
+  assert.equal(sent.filter(value => value.body.type === 'account.save').length, 0);
+  const saved = await send({ type: 'capture.confirm', candidateId: pending.candidate.id });
+  assert.equal(saved.candidate.result.action, 'created_account');
+  assert.equal(sent.at(-1).requestId, pending.candidate.id);
+  assert.equal(sent.at(-1).body.password, 'fixture');
+  await send({ type: 'capture.confirm', candidateId: pending.candidate.id });
+  assert.equal(sent.filter(value => value.body.type === 'account.save').length, 1);
+  const next = await send({ type: 'login.candidate', origin: 'https://example.invalid', username: 'alice', password: 'discard', revision: 1 });
+  await send({ type: 'capture.reject', candidateId: next.candidate.id });
+  assert.equal((await send({ type: 'capture.status' })).candidate, null);
+  const disconnected = await send({ type: 'login.candidate', origin: 'https://example.invalid', username: 'alice', password: 'must-discard', revision: 1 });
+  enabled = false;
+  await send({ type: 'capture.status' });
+  await send({ type: 'login.candidate', origin: 'https://example.invalid', username: 'alice', password: 'disabled', revision: 1 });
+  assert.equal(sent.filter(value => value.body.type === 'account.save').length, 1);
+  enabled = true;
+  assert.equal((await send({ type: 'capture.status' })).candidate, null);
+  await send({ type: 'capture.confirm', candidateId: disconnected.candidate.id });
+  assert.equal(sent.filter(value => value.body.type === 'account.save').length, 1);
+  disconnect.fire(); delete globalThis.chrome;
+});

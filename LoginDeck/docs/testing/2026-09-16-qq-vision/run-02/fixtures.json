@@ -1,0 +1,33 @@
+[
+  {
+    "id": "qq-empty-login",
+    "title": "QQ 空白账号密码登录页",
+    "image": "qq-empty-login.png",
+    "size": [
+      640,
+      920
+    ],
+    "state": "login_form",
+    "boxes": {
+      "username": [
+        64,
+        304,
+        576,
+        384
+      ],
+      "password": [
+        64,
+        408,
+        576,
+        488
+      ],
+      "submit": [
+        64,
+        605,
+        576,
+        685
+      ]
+    },
+    "notes": "Manual annotation. Agreement unchecked; login button appears disabled. Localization only; no action authorization."
+  }
+]

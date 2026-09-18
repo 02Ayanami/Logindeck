@@ -1,0 +1,58 @@
+{
+  "schema_version": 2,
+  "id": "com.tencent.qq-local",
+  "platform": "macos",
+  "application_id": "com.tencent.qq",
+  "states": {
+    "password": {
+      "kind": "login_page",
+      "controls": {
+        "password": {
+          "role": "secure_text_field",
+          "names": [
+            "输入QQ密码"
+          ],
+          "identifier": null,
+          "ancestor": null
+        },
+        "submit": {
+          "role": "button",
+          "names": [
+            "登录"
+          ],
+          "identifier": null,
+          "ancestor": null
+        },
+        "username": {
+          "role": "text_field",
+          "names": [
+            "输入QQ号"
+          ],
+          "identifier": null,
+          "ancestor": null
+        }
+      }
+    }
+  },
+  "flows": {
+    "fill": {
+      "kind": "login",
+      "timeout_ms": 120000,
+      "steps": [
+        {
+          "type": "fill",
+          "state": "password",
+          "target": "username",
+          "field": "username"
+        },
+        {
+          "type": "fill",
+          "state": "password",
+          "target": "password",
+          "field": "password"
+        }
+      ],
+      "outcome": "filled"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+[
+  {
+    "id": "login-zh",
+    "title": "中文登录",
+    "image": "login-zh.png",
+    "size": [
+      800,
+      600
+    ],
+    "state": "login_form",
+    "boxes": {
+      "username": [
+        220,
+        229,
+        580,
+        278
+      ],
+      "password": [
+        220,
+        326,
+        580,
+        375
+      ],
+      "submit": [
+        220,
+        428,
+        580,
+        480
+      ]
+    }
+  },
+  {
+    "id": "signed-in",
+    "title": "已登录主界面",
+    "image": "signed-in.png",
+    "size": [
+      900,
+      600
+    ],
+    "state": "already_logged_in",
+    "boxes": {
+      "username": null,
+      "password": null,
+      "submit": null
+    }
+  }
+]

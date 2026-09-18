@@ -1,0 +1,19 @@
+{
+  "started_at": "2026-09-16T08:52:03.538710+00:00",
+  "model": "gemini-2.5-flash",
+  "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+  "synthetic_only": true,
+  "provider": "google",
+  "enable_thinking": false,
+  "explicit_image_dimensions": true,
+  "request_count": 1,
+  "format_attempts": [
+    {
+      "case": "login-zh",
+      "mode": "json_schema",
+      "http_status": 404
+    }
+  ],
+  "message": "测试停止：接口返回 HTTP 404：模型或接口不可用；已停止。",
+  "results": []
+}

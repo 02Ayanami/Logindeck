@@ -1,0 +1,23 @@
+[package]
+name = "platform-macos"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1"
+base64 = "0.22"
+autologin-core = { path = "../autologin-core" }
+secrecy = "0.10"
+tokio = { version = "1", features = ["rt", "sync"] }
+uuid = { version = "1", features = ["v4"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+libc = "0.2"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSDictionary", "NSString", "NSGeometry"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSWorkspace", "NSRunningApplication", "libc", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "NSGraphics", "objc2-core-foundation"] }
+
+[dev-dependencies]
+serde_json = "1"
+tokio = { version = "1", features = ["macros"] }

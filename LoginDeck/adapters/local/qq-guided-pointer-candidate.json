@@ -1,0 +1,134 @@
+{
+  "schema_version": 2,
+  "id": "com.tencent.qq-guided-pointer-candidate",
+  "platform": "macos",
+  "application_id": "com.tencent.qq",
+  "states": {
+    "password": {
+      "kind": "login_page",
+      "controls": {
+        "password": {
+          "role": "secure_text_field",
+          "names": [
+            "输入QQ密码"
+          ],
+          "identifier": null,
+          "ancestor": null
+        },
+        "submit": {
+          "role": "button",
+          "names": [
+            "登录"
+          ],
+          "identifier": null,
+          "ancestor": null
+        },
+        "username": {
+          "role": "text_field",
+          "names": [
+            "输入QQ号"
+          ],
+          "identifier": null,
+          "ancestor": null
+        }
+      }
+    },
+    "home": {
+      "kind": "logged_in",
+      "controls": {
+        "menu": {
+          "role": "button",
+          "names": [
+            "更多"
+          ],
+          "descendant": {
+            "role": "button",
+            "names": [
+              "更多"
+            ]
+          }
+        }
+      },
+      "absent": [
+        {
+          "role": "menu_item",
+          "names": [
+            "退出账号"
+          ],
+          "identifier": null,
+          "ancestor": {
+            "role": "menu",
+            "names": [
+              "菜单"
+            ],
+            "identifier": null
+          },
+          "descendant": null
+        }
+      ]
+    },
+    "quick_login": {
+      "kind": "intermediate",
+      "controls": {
+        "password_login": {
+          "role": "button",
+          "names": [
+            "账密登录"
+          ]
+        }
+      }
+    },
+    "account_menu": {
+      "kind": "intermediate",
+      "controls": {
+        "logout": {
+          "role": "menu_item",
+          "names": [
+            "退出账号"
+          ],
+          "identifier": null,
+          "ancestor": {
+            "role": "menu",
+            "names": [
+              "菜单"
+            ],
+            "identifier": null
+          },
+          "descendant": null
+        }
+      }
+    }
+  },
+  "flows": {
+    "logout": {
+      "kind": "logout",
+      "timeout_ms": 10000,
+      "outcome": "logged_out",
+      "steps": [
+        {
+          "type": "click",
+          "state": "home",
+          "target": "menu",
+          "next_state": "account_menu"
+        },
+        {
+          "type": "click",
+          "state": "account_menu",
+          "target": "logout",
+          "next_state": "quick_login",
+          "expect_restart": true
+        },
+        {
+          "type": "click",
+          "state": "quick_login",
+          "target": "password_login",
+          "next_state": "password"
+        },
+        {
+          "type": "wait_state",
+          "state": "password"
+        }
+      ]
+    }
+  }
+}

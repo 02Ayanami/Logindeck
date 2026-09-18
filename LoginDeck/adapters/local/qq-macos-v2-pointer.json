@@ -1,0 +1,202 @@
+{
+  "schema_version": 3,
+  "id": "com.tencent.qq-pointer-click",
+  "platform": "macos",
+  "application_id": "com.tencent.qq",
+  "states": {
+    "account_menu": {
+      "kind": "intermediate",
+      "controls": {
+        "logout": {
+          "role": "menu_item",
+          "names": [
+            "退出账号"
+          ],
+          "identifier": null,
+          "ancestor": {
+            "role": "menu",
+            "names": [
+              "菜单"
+            ],
+            "identifier": null
+          }
+        }
+      }
+    },
+    "home": {
+      "kind": "logged_in",
+      "controls": {
+        "menu": {
+          "role": "button",
+          "names": [
+            "更多"
+          ],
+          "identifier": null,
+          "ancestor": null,
+          "descendant": {
+            "role": "button",
+            "names": [
+              "更多"
+            ],
+            "identifier": null
+          }
+        }
+      },
+      "absent": [
+        {
+          "role": "menu_item",
+          "names": [
+            "退出账号"
+          ],
+          "identifier": null,
+          "ancestor": {
+            "role": "menu",
+            "names": [
+              "菜单"
+            ],
+            "identifier": null
+          }
+        }
+      ]
+    },
+    "password": {
+      "kind": "login_page",
+      "controls": {
+        "agreement": {
+          "role": "checkbox",
+          "names": [
+            "已阅读并同意 服务协议 和 隐私政策"
+          ],
+          "identifier": null,
+          "ancestor": null
+        },
+        "password": {
+          "role": "secure_text_field",
+          "names": [
+            "输入QQ密码"
+          ],
+          "identifier": null,
+          "ancestor": null
+        },
+        "submit": {
+          "role": "button",
+          "names": [
+            "登录"
+          ],
+          "identifier": null,
+          "ancestor": null
+        },
+        "username": {
+          "role": "text_field",
+          "names": [
+            "输入QQ号"
+          ],
+          "identifier": null,
+          "ancestor": null
+        }
+      }
+    },
+    "quick_login": {
+      "kind": "intermediate",
+      "controls": {
+        "password_login": {
+          "role": "button",
+          "names": [
+            "账密登录"
+          ],
+          "identifier": null,
+          "ancestor": null
+        }
+      }
+    }
+  },
+  "flows": {
+    "login": {
+      "kind": "login",
+      "timeout_ms": 120000,
+      "steps": [
+        {
+          "type": "clear",
+          "state": "password",
+          "target": "username",
+          "field": "username"
+        },
+        {
+          "type": "clear",
+          "state": "password",
+          "target": "password",
+          "field": "password"
+        },
+        {
+          "type": "fill",
+          "state": "password",
+          "target": "username",
+          "field": "username"
+        },
+        {
+          "type": "fill",
+          "state": "password",
+          "target": "password",
+          "field": "password"
+        },
+        {
+          "type": "check",
+          "state": "password",
+          "target": "agreement"
+        },
+        {
+          "type": "submit",
+          "state": "password",
+          "target": "submit",
+          "next_states": [
+            "home"
+          ]
+        },
+        {
+          "type": "wait_state",
+          "state": "home"
+        }
+      ],
+      "outcome": "logged_in_observed"
+    },
+    "logout": {
+      "kind": "logout",
+      "timeout_ms": 30000,
+      "steps": [
+        {
+          "type": "click",
+          "state": "home",
+          "target": "menu",
+          "next_states": [
+            "account_menu"
+          ],
+          "method": "pointer"
+        },
+        {
+          "type": "click",
+          "state": "account_menu",
+          "target": "logout",
+          "next_states": [
+            "quick_login",
+            "password"
+          ],
+          "method": "pointer"
+        },
+        {
+          "type": "click",
+          "state": "quick_login",
+          "target": "password_login",
+          "next_states": [
+            "password"
+          ],
+          "method": "accessibility"
+        },
+        {
+          "type": "wait_state",
+          "state": "password"
+        }
+      ],
+      "outcome": "logged_out"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+.worktrees/
+.superpowers/
+
+target/
+
+*.autologin-draft
+*.autologin-lock
+
+browser-extension/dist/
+
+app/src-tauri/resources/edge/
+
+.DS_Store
+.pnpm-store/
+
+__pycache__/
+*.py[cod]

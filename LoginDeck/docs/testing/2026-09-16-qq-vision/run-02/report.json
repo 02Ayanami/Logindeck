@@ -1,0 +1,30 @@
+{
+  "started_at": "2026-09-16T09:23:46.758196+00:00",
+  "model": "gemini-3.6-flash",
+  "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+  "synthetic_only": false,
+  "provider": "google",
+  "enable_thinking": "model_default",
+  "explicit_image_dimensions": true,
+  "request_count": 1,
+  "format_attempts": [
+    {
+      "case": "qq-empty-login",
+      "mode": "json_schema",
+      "http_status": 503,
+      "service_message": "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later."
+    }
+  ],
+  "message": "测试完成：0 项通过，0 项未通过，1 项未完成验证。真实 QQ 兼容性仍需另测。",
+  "results": [
+    {
+      "passed": false,
+      "reason": "接口暂时不可用（HTTP 503），此项尚未验证",
+      "inconclusive": true,
+      "id": "qq-empty-login",
+      "title": "QQ 空白账号密码登录页",
+      "seconds": 9.84,
+      "mode": "json_schema"
+    }
+  ]
+}

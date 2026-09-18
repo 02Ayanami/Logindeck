@@ -1,0 +1,122 @@
+[
+  {
+    "id": "login-zh",
+    "title": "中文登录",
+    "image": "login-zh.png",
+    "size": [
+      800,
+      600
+    ],
+    "state": "login_form",
+    "boxes": {
+      "username": [
+        220,
+        229,
+        580,
+        278
+      ],
+      "password": [
+        220,
+        326,
+        580,
+        375
+      ],
+      "submit": [
+        220,
+        428,
+        580,
+        480
+      ]
+    }
+  },
+  {
+    "id": "login-en-dark",
+    "title": "英文深色登录",
+    "image": "login-en-dark.png",
+    "size": [
+      1000,
+      640
+    ],
+    "state": "login_form",
+    "boxes": {
+      "username": [
+        530,
+        229,
+        900,
+        278
+      ],
+      "password": [
+        530,
+        326,
+        900,
+        375
+      ],
+      "submit": [
+        530,
+        428,
+        900,
+        480
+      ]
+    }
+  },
+  {
+    "id": "qr",
+    "title": "扫码登录",
+    "image": "qr.png",
+    "size": [
+      800,
+      600
+    ],
+    "state": "qr_login",
+    "boxes": {
+      "username": null,
+      "password": null,
+      "submit": null
+    }
+  },
+  {
+    "id": "verification",
+    "title": "短信验证码",
+    "image": "verification.png",
+    "size": [
+      800,
+      600
+    ],
+    "state": "verification",
+    "boxes": {
+      "username": null,
+      "password": null,
+      "submit": null
+    }
+  },
+  {
+    "id": "signed-in",
+    "title": "已登录主界面",
+    "image": "signed-in.png",
+    "size": [
+      900,
+      600
+    ],
+    "state": "already_logged_in",
+    "boxes": {
+      "username": null,
+      "password": null,
+      "submit": null
+    }
+  },
+  {
+    "id": "registration",
+    "title": "注册页面",
+    "image": "registration.png",
+    "size": [
+      800,
+      600
+    ],
+    "state": "unknown",
+    "boxes": {
+      "username": null,
+      "password": null,
+      "submit": null
+    }
+  }
+]

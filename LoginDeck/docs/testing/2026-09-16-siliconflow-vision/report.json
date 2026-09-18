@@ -1,0 +1,66 @@
+{
+  "started_at": "2026-09-16T07:30:17.536667+00:00",
+  "model": "Qwen/Qwen3.5-4B",
+  "endpoint": "https://api.siliconflow.cn/v1/chat/completions",
+  "synthetic_only": true,
+  "request_count": 2,
+  "format_attempts": [],
+  "message": "测试停止：The read operation timed out",
+  "results": [
+    {
+      "passed": false,
+      "format_valid": true,
+      "state_matched": true,
+      "prediction": {
+        "password": [
+          300,
+          480,
+          600,
+          560
+        ],
+        "screen_state": "login_form",
+        "submit": [
+          280,
+          600,
+          720,
+          680
+        ],
+        "username": [
+          300,
+          350,
+          600,
+          430
+        ]
+      },
+      "controls": {
+        "username": {
+          "iou": 0.314,
+          "center_inside": true,
+          "passed": false
+        },
+        "password": {
+          "iou": 0.09,
+          "center_inside": false,
+          "passed": false
+        },
+        "submit": {
+          "iou": 0.0,
+          "center_inside": false,
+          "passed": false
+        }
+      },
+      "unsafe_fill_prediction": false,
+      "response_text": "{\n  \"password\": [\n    300,\n    480,\n    600,\n    560\n  ],\n  \"screen_state\": \"login_form\",\n  \"submit\": [\n    280,\n    600,\n    720,\n    680\n  ],\n  \"username\": [\n    300,\n    350,\n    600,\n    430\n  ]\n}",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 652,
+        "completion_tokens": 1983,
+        "total_tokens": 2635
+      },
+      "id": "login-zh",
+      "title": "中文登录",
+      "seconds": 37.93,
+      "mode": "json_schema"
+    }
+  ]
+}

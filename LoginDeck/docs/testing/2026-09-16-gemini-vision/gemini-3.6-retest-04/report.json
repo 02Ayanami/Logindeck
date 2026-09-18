@@ -1,0 +1,93 @@
+{
+  "started_at": "2026-09-16T09:07:56.830906+00:00",
+  "model": "gemini-3.6-flash",
+  "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+  "synthetic_only": true,
+  "provider": "google",
+  "enable_thinking": "model_default",
+  "explicit_image_dimensions": true,
+  "request_count": 2,
+  "format_attempts": [],
+  "message": "测试完成：2 项通过，0 项未通过，0 项未完成验证。真实 QQ 兼容性仍需另测。",
+  "results": [
+    {
+      "passed": true,
+      "format_valid": true,
+      "state_matched": true,
+      "prediction": {
+        "screen_state": "login_form",
+        "username": [
+          275,
+          383,
+          725,
+          463
+        ],
+        "password": [
+          275,
+          543,
+          725,
+          623
+        ],
+        "submit": [
+          275,
+          713,
+          726,
+          802
+        ]
+      },
+      "controls": {
+        "username": {
+          "iou": 0.98,
+          "center_inside": true,
+          "passed": true
+        },
+        "password": {
+          "iou": 0.972,
+          "center_inside": true,
+          "passed": true
+        },
+        "submit": {
+          "iou": 0.972,
+          "center_inside": true,
+          "passed": true
+        }
+      },
+      "unsafe_fill_prediction": false,
+      "response_text": "{\n  \"screen_state\": \"login_form\",\n  \"username\": [275, 383, 725, 463],\n  \"password\": [275, 543, 725, 623],\n  \"submit\": [275, 713, 726, 802]\n}",
+      "finish_reason": "STOP",
+      "usage": {
+        "prompt_tokens": 1328,
+        "completion_tokens": 90,
+        "total_tokens": 2676
+      },
+      "id": "login-zh",
+      "title": "中文登录",
+      "seconds": 9.44,
+      "mode": "json_schema"
+    },
+    {
+      "passed": true,
+      "format_valid": true,
+      "state_matched": true,
+      "prediction": {
+        "screen_state": "already_logged_in",
+        "username": null,
+        "password": null,
+        "submit": null
+      },
+      "controls": {},
+      "unsafe_fill_prediction": false,
+      "response_text": "{\"screen_state\": \"already_logged_in\", \"username\": null, \"password\": null, \"submit\": null}",
+      "finish_reason": "STOP",
+      "usage": {
+        "prompt_tokens": 1344,
+        "completion_tokens": 27,
+        "total_tokens": 1585
+      },
+      "id": "signed-in",
+      "title": "已登录主界面",
+      "seconds": 10.67,
+      "mode": "json_schema"
+    }
+  ]
+}

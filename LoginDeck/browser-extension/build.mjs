@@ -1,0 +1,14 @@
+import { readFile, mkdir, copyFile, writeFile, rm } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { build } from '../app/node_modules/vite/dist/node/index.js';
+const root = fileURLToPath(new URL('.', import.meta.url));
+const { version } = JSON.parse(await readFile(root + 'package.json', 'utf8'));
+const identity = JSON.parse(await readFile(root + 'identity.json', 'utf8'));
+await rm(root + 'dist', {recursive:true, force:true});
+await mkdir(root + 'dist', {recursive:true});
+await build({ configFile:false, root, logLevel:'warn', build:{outDir:'dist',emptyOutDir:false,minify:false,lib:{entry:root+'src/content.js',name:'LoginDeckCapture',formats:['iife'],fileName:()=> 'content.js'}}});
+for (const file of ['background.js','policy.js','popup.html','popup.js','popup.css','messages.js']) await copyFile(root+'src/'+file,root+'dist/'+file);
+for (const size of [16,32,128]) await copyFile(root+`../app/src-tauri/icons/${size}x${size}.png`,root+`dist/icon${size}.png`);
+await writeFile(root+'dist/manifest.json', JSON.stringify({manifest_version:3,name:'LoginDeck · Edge',version,description:'Confirm and save submitted logins in your local LoginDeck vault.',key:identity.key,permissions:['nativeMessaging','scripting','storage'],host_permissions:['https://*/*'],background:{service_worker:'background.js',type:'module'},icons:{16:'icon16.png',32:'icon32.png',128:'icon128.png'},action:{default_icon:{16:'icon16.png',32:'icon32.png'},default_popup:'popup.html',default_title:'LoginDeck'},content_security_policy:{extension_pages:"script-src 'self'; object-src 'none'"}},null,2));
+console.log('Edge unpacked extension:',root+'dist');
+console.log('Extension ID:',identity.id);

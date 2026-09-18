@@ -1,0 +1,29 @@
+{
+  "install": {
+    "title": "Install Edge extension",
+    "back": "Back to extension guide",
+    "intro": "No terminal commands needed. LoginDeck prepares the extension and local connection component; you finish installation in Edge.",
+    "prepareTitle": "1. Prepare installation files",
+    "preparing": "Setting up the local connection and extension files…",
+    "prepared": "Ready. The local component is configured. Load the extension in Edge next.",
+    "notPrepared": "Installation files are not ready yet.",
+    "retry": "Retry setup",
+    "edgeTitle": "2. Load the extension in Edge",
+    "edgeStep": "Open Edge below, enable Developer mode at the lower left, and click Load unpacked.",
+    "openEdge": "Open Edge extensions",
+    "folderStep": "Click Show extension folder. Finder selects edge-extension. Choose this folder in the Edge folder picker.",
+    "openFolder": "Show extension folder",
+    "pathLabel": "Extension folder path",
+    "pathTip": "Cannot find it? Copy the path above, press Command + Shift + G in the Edge folder picker, paste the path, press Enter, and select the folder.",
+    "developerAlt": "Enable Developer mode in Edge (Chinese UI)",
+    "loadAlt": "Click Load unpacked (Chinese UI)",
+    "finishTitle": "3. Check connection",
+    "finishStep": "Keep LoginDeck running, pin the extension to the Edge toolbar and select Check connection. After connecting, submit a website login form to see the save prompt. Once you confirm, LoginDeck adds the account or updates its password.",
+    "updateTip": "Already installed? After preparing files again, click Reload for LoginDeck in Edge. If the old extension was loaded from the source project, load the stable folder above instead.",
+    "finish": "Done",
+    "failed": "Setup or opening failed. Retry; if it persists, check that your user directory is writable.",
+    "conflict": "A different registration or unfinished installation exists. It was not overwritten. Ask the maintainer to check it before retrying.",
+    "missing": "Installation resources are missing. Use a complete LoginDeck app bundle.",
+    "edgeMissing": "Could not open Microsoft Edge. Install Edge or enter edge://extensions in its address bar manually."
+  }
+}

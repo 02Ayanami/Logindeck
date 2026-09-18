@@ -1,0 +1,19 @@
+{
+  "started_at": "2026-09-16T07:58:04.101200+00:00",
+  "model": "nex-agi/nex-n2.5-mini:free",
+  "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "synthetic_only": true,
+  "provider": "openrouter",
+  "enable_thinking": false,
+  "explicit_image_dimensions": true,
+  "request_count": 1,
+  "format_attempts": [
+    {
+      "case": "login-zh",
+      "mode": "json_schema",
+      "http_status": 400
+    }
+  ],
+  "message": "测试停止：接口返回 HTTP 400；已停止。请检查密钥、实名认证、模型权限或限额。",
+  "results": []
+}

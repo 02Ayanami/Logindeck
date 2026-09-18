@@ -1,0 +1,19 @@
+[package]
+name = "autologin-native-host"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+
+[dependencies]
+autologin-core = { path = "../autologin-core" }
+platform-runtime = { path = "../platform-runtime" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+secrecy = "0.10"
+zeroize = "1"
+uuid = { version = "1", features = ["v4"] }
+url = "2"
+tokio = { version = "1", features = ["rt", "time", "sync"] }
+
+[dev-dependencies]
+async-trait = "0.1"

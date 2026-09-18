@@ -1,0 +1,11 @@
+[package]
+name = "platform-runtime"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+
+[dependencies]
+autologin-core = { path = "../autologin-core" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+platform-macos = { path = "../platform-macos" }

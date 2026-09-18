@@ -1,0 +1,20 @@
+{
+  "started_at": "2026-09-16T08:58:05.443124+00:00",
+  "model": "gemini-2.5-flash",
+  "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+  "synthetic_only": true,
+  "provider": "google",
+  "enable_thinking": false,
+  "explicit_image_dimensions": true,
+  "request_count": 1,
+  "format_attempts": [
+    {
+      "case": "login-zh",
+      "mode": "json_schema",
+      "http_status": 404,
+      "service_message": "This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use models/gemini-3.6-flash for the latest features and improvements. We recommend you to use the Interactions API."
+    }
+  ],
+  "message": "测试停止：接口返回 HTTP 404：模型或接口不可用；已停止。服务说明：This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use models/gemini-3.6-flash for the latest features and improvements. We recommend you to use the Interactions API.",
+  "results": []
+}

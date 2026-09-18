@@ -1,0 +1,39 @@
+{
+  "name": "autologin-app",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.19.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "desktop": "node ../scripts/tauri.mjs dev",
+    "tauri": "node ../scripts/tauri.mjs",
+    "sync-version": "node ../scripts/sync-version.mjs",
+    "typecheck": "tsc -b",
+    "build": "pnpm sync-version && pnpm typecheck && vite build",
+    "preflight": "node ../scripts/preflight-macos.mjs",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.9.1",
+    "i18next": "^25.8.13",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-i18next": "^16.5.5",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.6",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "jsdom": "^28.1.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "vitest": "^4.1.0"
+  }
+}

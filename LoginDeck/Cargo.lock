@@ -2883,6 +2883,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "platform-windows"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "autologin-core",
+ "base64 0.22.1",
+ "secrecy",
+ "serde_json",
+ "tokio",
+ "uuid",
+ "windows",
+ "zeroize",
+]
+
+[[package]]
 name = "plist"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

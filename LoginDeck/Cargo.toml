@@ -6,4 +6,5 @@ members = [
   "crates/native-host",
   "crates/platform-runtime",
   "crates/platform-macos",
+  "crates/platform-windows",
 ]

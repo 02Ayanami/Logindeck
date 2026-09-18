@@ -1,0 +1,385 @@
+//! Safe Start Menu shortcut index.
+
+use super::win32::{is_command_host, local_path, path_key, within};
+use std::path::{Path, PathBuf};
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Shortcut {
+    pub(crate) name: String,
+    pub(crate) target: PathBuf,
+    pub(crate) source: String,
+}
+
+fn decode_buffer(buffer: &[u16]) -> Option<String> {
+    let end = buffer.iter().position(|unit| *unit == 0)?;
+    // A full buffer may be a successful-but-truncated shell API result.
+    if end == buffer.len().checked_sub(1)? {
+        return None;
+    }
+    String::from_utf16(&buffer[..end]).ok()
+}
+
+fn parse_shortcut(name: &str, target: &str, arguments: &str, source: &str) -> Option<Shortcut> {
+    if name.trim().is_empty()
+        || name.len() > 256
+        || name.chars().any(char::is_control)
+        || !arguments.is_empty()
+        || !local_path(target)
+        || is_command_host(target)
+        || !Path::new(target).extension()?.eq_ignore_ascii_case("exe")
+        || source.is_empty()
+        || source.len() > 4096
+        || source.contains('\0')
+    {
+        return None;
+    }
+    Some(Shortcut {
+        name: name.trim().into(),
+        target: target.into(),
+        source: source.into(),
+    })
+}
+
+pub(crate) fn matching_shortcuts<'a>(
+    shortcuts: &'a [Shortcut],
+    name: &str,
+    root: &Path,
+) -> Vec<&'a Shortcut> {
+    let mut matched: Vec<_> = shortcuts
+        .iter()
+        .filter(|shortcut| {
+            within(&shortcut.target, root) && shortcut.name.eq_ignore_ascii_case(name)
+        })
+        .collect();
+    matched.sort_by_key(|shortcut| (path_key(&shortcut.target), &shortcut.source));
+    matched
+}
+
+#[cfg(windows)]
+pub(crate) fn enumerate(
+    probe: &impl super::win32::PathProbe,
+) -> Result<Vec<Shortcut>, autologin_core::AppError> {
+    native::enumerate(probe)
+}
+
+#[cfg(windows)]
+mod native {
+    use super::super::win32::PathProbe;
+    use super::*;
+    use std::{
+        fs,
+        os::windows::{ffi::OsStrExt, fs::MetadataExt},
+    };
+    use windows::{
+        core::{Interface, PCWSTR},
+        Win32::{
+            Foundation::RPC_E_CHANGED_MODE,
+            Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT,
+            System::Com::{
+                CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, IPersistFile,
+                CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, STGM_READ, STGM_SHARE_DENY_WRITE,
+            },
+            UI::Shell::{
+                FOLDERID_CommonPrograms, FOLDERID_Programs, IShellLinkW, SHGetKnownFolderPath,
+                ShellLink, KF_FLAG_DONT_VERIFY, SLGP_RAWPATH,
+            },
+        },
+    };
+
+    const MAX_ENTRIES: usize = 4096;
+    const MAX_DEPTH: usize = 6;
+    const MAX_LINK_BYTES: u64 = 1024 * 1024;
+
+    struct Apartment(bool);
+    impl Apartment {
+        fn enter() -> Option<Self> {
+            let status = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+            if status.is_ok() {
+                Some(Self(true))
+            } else if status == RPC_E_CHANGED_MODE {
+                Some(Self(false))
+            } else {
+                None
+            }
+        }
+    }
+    impl Drop for Apartment {
+        fn drop(&mut self) {
+            if self.0 {
+                unsafe { CoUninitialize() };
+            }
+        }
+    }
+    struct FolderMemory(windows::core::PWSTR);
+    impl Drop for FolderMemory {
+        fn drop(&mut self) {
+            unsafe { CoTaskMemFree(Some(self.0 .0.cast())) };
+        }
+    }
+
+    fn known_folder(id: &windows::core::GUID) -> Option<String> {
+        let memory =
+            FolderMemory(unsafe { SHGetKnownFolderPath(id, KF_FLAG_DONT_VERIFY, None) }.ok()?);
+        if memory.0.is_null() {
+            return None;
+        }
+        // The known-folder API owns a NUL-terminated allocation; cap copying.
+        let mut units = Vec::new();
+        for index in 0..4096 {
+            let unit = unsafe { *memory.0 .0.add(index) };
+            if unit == 0 {
+                return String::from_utf16(&units).ok();
+            }
+            units.push(unit);
+        }
+        None
+    }
+
+    fn load(path: &Path, source: &str, probe: &impl PathProbe) -> Option<Shortcut> {
+        if !local_path(path.to_str()?) || !path.extension()?.eq_ignore_ascii_case("lnk") {
+            return None;
+        }
+        let metadata = fs::symlink_metadata(path).ok()?;
+        if !metadata.is_file()
+            || metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT.0 != 0
+            || metadata.len() > MAX_LINK_BYTES
+        {
+            return None;
+        }
+        probe.directory(path.parent()?.to_str()?)?;
+        // Pin the link and all ancestor components while COM reads it. This closes
+        // the check/load gap for a link or directory swapped to a reparse point.
+        let _checked = super::super::win32::filesystem::checked_file(path.to_str()?)?;
+        let link: IShellLinkW =
+            unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER) }.ok()?;
+        let persisted: IPersistFile = link.cast().ok()?;
+        let file_name: Vec<_> = path.as_os_str().encode_wide().chain([0]).collect();
+        unsafe {
+            persisted.Load(
+                PCWSTR(file_name.as_ptr()),
+                STGM_READ | STGM_SHARE_DENY_WRITE,
+            )
+        }
+        .ok()?;
+        let mut target = [0u16; 4096];
+        let mut arguments = [0u16; 4096];
+        // Do not call Resolve: it can search, repair, contact remote paths, or show UI.
+        unsafe { link.GetPath(&mut target, std::ptr::null_mut(), SLGP_RAWPATH.0 as u32) }.ok()?;
+        unsafe { link.GetArguments(&mut arguments) }.ok()?;
+        let mut shortcut = parse_shortcut(
+            path.file_stem()?.to_str()?,
+            &decode_buffer(&target)?,
+            &decode_buffer(&arguments)?,
+            source,
+        )?;
+        shortcut.target = probe.executable(shortcut.target.to_str()?)?.path;
+        Some(shortcut)
+    }
+
+    pub(super) fn enumerate(
+        probe: &impl PathProbe,
+    ) -> Result<Vec<Shortcut>, autologin_core::AppError> {
+        let _apartment = Apartment::enter()
+            .ok_or_else(|| autologin_core::AppError::new("application.discovery_unavailable"))?;
+        let mut shortcuts = Vec::new();
+        for (id, label) in [
+            (FOLDERID_Programs, "user-programs"),
+            (FOLDERID_CommonPrograms, "common-programs"),
+        ] {
+            let Some(root) = known_folder(&id).and_then(|path| probe.directory(&path)) else {
+                continue;
+            };
+            let Some(_root_guard) = root
+                .to_str()
+                .and_then(super::super::win32::filesystem::checked_directory)
+            else {
+                continue;
+            };
+            let mut pending = vec![(root.clone(), 0usize)];
+            let mut visited = 0;
+            let mut exceeded = false;
+            let start = shortcuts.len();
+            while let Some((directory, depth)) = pending.pop() {
+                if probe.directory(directory.to_str().unwrap_or("")).is_none() {
+                    continue;
+                }
+                let Some(_directory_guard) = directory
+                    .to_str()
+                    .and_then(super::super::win32::filesystem::checked_directory)
+                else {
+                    continue;
+                };
+                let Ok(children) = fs::read_dir(&directory) else {
+                    continue;
+                };
+                let mut children = children
+                    .take(MAX_ENTRIES + 1)
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap_or_default();
+                children.sort_by_key(|child| path_key(&child.path()));
+                for child in children {
+                    visited += 1;
+                    if visited > MAX_ENTRIES {
+                        exceeded = true;
+                        break;
+                    }
+                    let path = child.path();
+                    let Ok(metadata) = fs::symlink_metadata(&path) else {
+                        continue;
+                    };
+                    if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT.0 != 0 {
+                        continue;
+                    }
+                    if metadata.is_dir() && depth < MAX_DEPTH {
+                        if let Some(directory) = path
+                            .to_str()
+                            .and_then(|path| probe.directory(path))
+                            .filter(|path| within(path, &root))
+                        {
+                            pending.push((directory, depth + 1));
+                        }
+                    } else if metadata.is_file()
+                        && path
+                            .extension()
+                            .is_some_and(|extension| extension.eq_ignore_ascii_case("lnk"))
+                    {
+                        let source = format!(
+                            "{label}:{}",
+                            path.strip_prefix(&root).unwrap_or(&path).display()
+                        );
+                        if let Some(shortcut) = load(&path, &source, probe) {
+                            shortcuts.push(shortcut);
+                        }
+                    }
+                }
+                if exceeded {
+                    break;
+                }
+            }
+            // A truncated source must not select an arbitrary filesystem-order winner.
+            if exceeded {
+                shortcuts.truncate(start);
+            }
+        }
+        shortcuts.sort_by_key(|shortcut| (path_key(&shortcut.target), shortcut.source.clone()));
+        Ok(shortcuts)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::super::super::win32::NativePathProbe;
+        use super::*;
+
+        #[test]
+        fn com_link_fixture_reads_exact_target_and_rejects_arguments_without_launching() {
+            struct Temp(PathBuf);
+            impl Drop for Temp {
+                fn drop(&mut self) {
+                    let _ = fs::remove_dir_all(&self.0);
+                }
+            }
+            let tree = Temp(
+                std::env::temp_dir()
+                    .join(format!("logindeck-shortcut-test-{}", uuid::Uuid::new_v4())),
+            );
+            fs::create_dir(&tree.0).unwrap();
+            let target = tree.0.join("chat.exe");
+            fs::write(&target, b"inert fixture - never executable").unwrap();
+            let _apartment = Apartment::enter().unwrap();
+            for (name, arguments, expected) in
+                [("Chat", "", true), ("ChatWithArgs", "--arbitrary", false)]
+            {
+                let path = tree.0.join(format!("{name}.lnk"));
+                let link: IShellLinkW =
+                    unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER) }.unwrap();
+                let wide_target: Vec<_> = target.as_os_str().encode_wide().chain([0]).collect();
+                let wide_args: Vec<_> = arguments.encode_utf16().chain([0]).collect();
+                let wide_path: Vec<_> = path.as_os_str().encode_wide().chain([0]).collect();
+                unsafe { link.SetPath(PCWSTR(wide_target.as_ptr())) }.unwrap();
+                unsafe { link.SetArguments(PCWSTR(wide_args.as_ptr())) }.unwrap();
+                let persisted: IPersistFile = link.cast().unwrap();
+                unsafe { persisted.Save(PCWSTR(wide_path.as_ptr()), true) }.unwrap();
+                drop(persisted);
+                drop(link);
+                let actual = load(&path, "user-programs:Chat.lnk", &NativePathProbe);
+                assert_eq!(actual.is_some(), expected);
+                if let Some(actual) = actual {
+                    assert_eq!(actual.target, target);
+                }
+                // The loader and COM object released their handles.
+                fs::remove_file(&path).unwrap();
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn shortcut_buffers_require_a_terminator_and_valid_utf16() {
+        assert_eq!(decode_buffer(&[65, 0, 66]), Some("A".into()));
+        assert_eq!(decode_buffer(&[65, 66]), None);
+        assert_eq!(decode_buffer(&[0xd800, 0]), None);
+    }
+
+    #[test]
+    fn raw_shortcuts_never_parse_arguments_or_accept_unsafe_targets() {
+        assert!(parse_shortcut(
+            "Chat",
+            r"C:\Apps\Chat\chat.exe",
+            "",
+            "user-programs:Chat.lnk"
+        )
+        .is_some());
+        for (target, args) in [
+            (r"C:\Apps\Chat\chat.exe", "--launch-anything"),
+            ("chat.exe", ""),
+            (r"\\server\share\chat.exe", ""),
+            (r"C:\Apps\chat.cmd", ""),
+            (r"C:\Apps\chat.exe:stream", ""),
+            (r"C:\Windows\System32\cmd.exe", ""),
+            (r"C:\Apps\..\chat.exe", ""),
+        ] {
+            assert!(parse_shortcut("Chat", target, args, "user-programs:Chat.lnk").is_none());
+        }
+        assert!(parse_shortcut("", r"C:\Apps\Chat\chat.exe", "", "source").is_none());
+        assert!(parse_shortcut(&"a".repeat(257), r"C:\Apps\Chat\chat.exe", "", "source").is_none());
+    }
+
+    #[test]
+    fn shortcut_match_requires_install_anchor_and_name_with_stable_order() {
+        let items = vec![
+            Shortcut {
+                name: "Chat".into(),
+                target: r"C:\Apps\Chat\z.exe".into(),
+                source: "common-programs:z.lnk".into(),
+            },
+            Shortcut {
+                name: "Chat".into(),
+                target: r"C:\Apps\ChatExtra\chat.exe".into(),
+                source: "outside".into(),
+            },
+            Shortcut {
+                name: "Other".into(),
+                target: r"C:\Apps\Chat\other.exe".into(),
+                source: "wrong-name".into(),
+            },
+            Shortcut {
+                name: "chat".into(),
+                target: r"C:\Apps\Chat\a.exe".into(),
+                source: "user-programs:a.lnk".into(),
+            },
+        ];
+        let matched = matching_shortcuts(&items, "Chat", Path::new(r"C:\Apps\Chat"));
+        assert_eq!(
+            matched
+                .iter()
+                .map(|item| item.source.as_str())
+                .collect::<Vec<_>>(),
+            vec!["user-programs:a.lnk", "common-programs:z.lnk"]
+        );
+    }
+}

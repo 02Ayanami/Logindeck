@@ -1,0 +1,23 @@
+[
+  {"entry":{"key":"Chat","name":{"value":"Chat"},"icon":{"value":"\"C:\\Apps\\Chat\\chat.exe\",0"}},"files":["C:\\Apps\\Chat\\chat.exe"],"expected":{"name":"Chat","target":"exe:C:\\Apps\\Chat\\chat.exe","source":"hkcu64:chat"}},
+  {"entry":{"name":{"value":"Chat"},"icon":{"value":"%APPS%\\Chat\\chat.exe","kind":"expand"}},"files":["C:\\Apps\\Chat\\chat.exe"],"expected":{"name":"Chat","target":"exe:C:\\Apps\\Chat\\chat.exe","source":"hkcu64:app"}},
+  {"entry":{"name":{"value":"Chat"},"icon":{"value":"%APPS%\\Chat\\chat.exe","kind":"string"}},"files":["C:\\Apps\\Chat\\chat.exe"],"expected":null},
+  {"entry":{"name":{"value":"Chat"},"system":1,"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"],"expected":null},
+  {"entry":{"name":{"value":"Chat"},"release":{"value":"Update"},"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"],"expected":null},
+  {"entry":{"name":{"value":"Chat"},"parent":{"value":"Parent-App"},"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"],"expected":null},
+  {"entry":{"name":{"value":"  "},"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"],"expected":null},
+  {"entry":{"name":{"value":"Chat"},"icon":{"value":"C:\\Apps\\Chat\\unins000.exe"},"UninstallString":"C:\\Apps\\Chat\\chat.exe"},"files":["C:\\Apps\\Chat\\unins000.exe","C:\\Apps\\Chat\\chat.exe"],"expected":null},
+  {"entry":{"name":{"value":"Chat"},"icon":{"value":"C:\\Apps\\Chat\\updater.exe"}},"files":["C:\\Apps\\Chat\\updater.exe"],"expected":null},
+  {"entry":{"name":{"value":"Chat"},"icon":{"value":"C:\\Apps\\Chat\\chat.ico"},"location":{"value":"C:\\Apps\\Chat"}},"files":["C:\\Apps\\Chat\\chat.exe"],"directories":["C:\\Apps\\Chat"],"shortcuts":[{"name":"Chat","target":"C:\\Apps\\Chat\\chat.exe"}],"expected":{"name":"Chat","target":"exe:C:\\Apps\\Chat\\chat.exe","source":"hkcu64:app"}},
+  {"entry":{"name":{"value":"Chat"},"location":{"value":"C:\\Apps\\Chat"}},"files":["C:\\Apps\\Chat\\bin\\chat.exe"],"directories":["C:\\Apps\\Chat"],"scans":{"C:\\Apps\\Chat":"C:\\Apps\\Chat\\bin\\chat.exe"},"expected":{"name":"Chat","target":"exe:C:\\Apps\\Chat\\bin\\chat.exe","source":"hkcu64:app"}},
+  {"entry":{"name":{"value":"Chat"},"icon":{"value":"chat.exe"}},"files":[],"expected":null},
+  {"entry":{"name":{"value":"Chat"},"icon":{"value":"\\\\server\\share\\chat.exe"}},"files":[],"expected":null},
+  {"entry":{"name":{"value":"Chat"},"icon":{"value":"C:\\Junction\\chat.exe"}},"files":[],"rejected":"reparse","expected":null},
+  {"entry":{"name":{"value":"Chat"},"icon":{"value":"C:\\Missing\\chat.exe"}},"files":[],"expected":null},
+  {"entry":{"name":{"value":"Chat"},"icon":{"value":"C:\\Apps\\Chat\\chat.dll"}},"files":["C:\\Apps\\Chat\\chat.dll"],"expected":null},
+  {"entry":{"scope":"hklm64","key":"chat","name":{"value":"Chat"},"version":{"value":"2.0"},"icon":{"value":"C:\\APPS\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"],"expected":{"name":"Chat","target":"exe:C:\\Apps\\Chat\\chat.exe","source":"hklm64:chat"}},
+  {"entry":{"scope":"hklm32","key":"other-chat","name":{"value":"Chat"},"icon":{"value":"C:\\Other\\chat.exe"}},"files":["C:\\Other\\chat.exe"],"expected":{"name":"Chat","target":"exe:C:\\Other\\chat.exe","source":"hklm32:other-chat"}},
+  {"entry":{"name":{"value":"Security Update for Chat (KB1234)"},"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"],"expected":null},
+  {"entry":{"name":{"value":"Chat"},"location":{"value":"C:\\Apps\\Chat"}},"files":["C:\\Apps\\Other\\chat.exe"],"directories":["C:\\Apps\\Chat"],"shortcuts":[{"name":"Chat","target":"C:\\Apps\\Other\\chat.exe"}],"expected":null},
+  {"entry":{"name":{"value":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"],"expected":null}
+]

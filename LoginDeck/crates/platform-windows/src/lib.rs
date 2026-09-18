@@ -1,5 +1,6 @@
 //! Windows platform integration primitives for LoginDeck.
 
+pub(crate) mod app_catalog;
 pub mod clipboard;
 pub mod credentials;
 pub mod error;

@@ -3,7 +3,7 @@ mod tests {
     use super::{credential_error, credential_last_status, record_last_status};
 
     const ERROR_ACCESS_DENIED: u32 = 5;
-    const ERROR_NOT_FOUND: u32 = 1_160;
+    const ERROR_NOT_FOUND: u32 = 1_168;
     const ERROR_NO_SUCH_LOGON_SESSION: u32 = 1_313;
 
     #[test]
@@ -36,7 +36,7 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use autologin_core::AppError;
 
 const ERROR_ACCESS_DENIED: u32 = 5;
-const ERROR_NOT_FOUND: u32 = 1_160;
+const ERROR_NOT_FOUND: u32 = 1_168;
 const ERROR_NO_SUCH_LOGON_SESSION: u32 = 1_313;
 const NO_STATUS: i32 = i32::MIN;
 

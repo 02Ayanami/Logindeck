@@ -15,7 +15,7 @@ impl WindowsCredentialStore {
 
 #[cfg(target_os = "windows")]
 mod native {
-    use std::{ptr, slice};
+    use std::{ptr, slice, sync::Mutex};
 
     use autologin_core::AppError;
     use secrecy::{ExposeSecret, SecretString};
@@ -29,9 +29,13 @@ mod native {
             },
         },
     };
-    use zeroize::Zeroizing;
+    use zeroize::{Zeroize, Zeroizing};
 
     use crate::credential_error;
+
+    // Credential Manager has no create-only write. Serialize the required read-before-write
+    // sequence across every WindowsCredentialStore instance in this process.
+    static PUT_LOCK: Mutex<()> = Mutex::new(());
 
     struct CredentialBuffer(*mut CREDENTIALW);
 
@@ -44,9 +48,31 @@ mod native {
 
     impl Drop for CredentialBuffer {
         fn drop(&mut self) {
-            // SAFETY: The pointer came from a successful CredReadW and is freed exactly once.
-            unsafe { CredFree(self.0.cast()) };
+            // SAFETY: The pointer came from a successful CredReadW and is released exactly once.
+            unsafe {
+                release_credential_with(self.0, |pointer| CredFree(pointer));
+            }
         }
+    }
+
+    unsafe fn release_credential_with<F>(credential: *mut CREDENTIALW, free: F)
+    where
+        F: FnOnce(*const std::ffi::c_void),
+    {
+        // A successful CredReadW owns both the structure and its blob until CredFree. Only form a
+        // mutable slice when all metadata is within the documented Generic Credential bound.
+        if let Some(credential) = unsafe { credential.as_mut() } {
+            let length = credential.CredentialBlobSize as usize;
+            if length > 0
+                && length <= CRED_MAX_CREDENTIAL_BLOB_SIZE as usize
+                && !credential.CredentialBlob.is_null()
+            {
+                // SAFETY: The non-null blob belongs to this live credential allocation and the
+                // checked length is the API-provided size within its documented maximum.
+                unsafe { slice::from_raw_parts_mut(credential.CredentialBlob, length) }.zeroize();
+            }
+        }
+        free(credential.cast());
     }
 
     fn wide(value: &str, field: &'static str) -> Result<Vec<u16>, AppError> {
@@ -99,8 +125,10 @@ mod native {
             return Err(AppError::invalid_field("password"));
         }
 
+        let _put_guard = PUT_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         match read_native(&target) {
             Ok(_existing) => return Err(AppError::new("storage.conflict")),
+            // Absence is the expected precondition for create and is not an exposed failure.
             Err(status) if status == ERROR_NOT_FOUND.0 => {}
             Err(0) => return Err(AppError::new("credential.unavailable")),
             Err(status) => return Err(credential_error(status)),
@@ -150,6 +178,57 @@ mod native {
         unsafe { CredDeleteW(PCWSTR(target.as_ptr()), CRED_TYPE_GENERIC, None) }
             .map_err(native_status)
             .map_err(credential_error)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use std::{cell::Cell, ffi::c_void, ptr};
+
+        use windows::Win32::Security::Credentials::{CREDENTIALW, CRED_MAX_CREDENTIAL_BLOB_SIZE};
+
+        use super::release_credential_with;
+
+        #[test]
+        fn credential_release_zeroes_only_a_valid_blob_before_free() {
+            let mut blob = vec![0x41, 0x42, 0x43, 0x44];
+            let mut credential = CREDENTIALW {
+                CredentialBlobSize: blob.len() as u32,
+                CredentialBlob: blob.as_mut_ptr(),
+                ..Default::default()
+            };
+            let expected_pointer = (&mut credential as *mut CREDENTIALW).cast::<c_void>();
+            let freed = Cell::new(false);
+
+            // SAFETY: the fake credential and its blob remain live throughout this call.
+            unsafe {
+                release_credential_with(&mut credential, |pointer| {
+                    assert_eq!(pointer, expected_pointer);
+                    assert!(blob.iter().all(|byte| *byte == 0));
+                    freed.set(true);
+                });
+            }
+            assert!(freed.get());
+
+            let mut sentinel = [0x5a_u8];
+            for (pointer, length) in [
+                (ptr::null_mut(), 0),
+                (ptr::null_mut(), 1),
+                (sentinel.as_mut_ptr(), CRED_MAX_CREDENTIAL_BLOB_SIZE + 1),
+            ] {
+                let mut invalid = CREDENTIALW {
+                    CredentialBlobSize: length,
+                    CredentialBlob: pointer,
+                    ..Default::default()
+                };
+                let freed = Cell::new(false);
+                // SAFETY: invalid pointer/length pairs must be rejected before any slice is made.
+                unsafe {
+                    release_credential_with(&mut invalid, |_| freed.set(true));
+                }
+                assert!(freed.get());
+                assert_eq!(sentinel, [0x5a]);
+            }
+        }
     }
 }
 

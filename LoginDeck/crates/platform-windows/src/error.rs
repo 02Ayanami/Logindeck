@@ -42,12 +42,16 @@ const NO_STATUS: i32 = i32::MIN;
 
 static LAST_STATUS: AtomicI32 = AtomicI32::new(NO_STATUS);
 
-/// Records the most recent native credential status without preserving its message text.
+/// Records a failing native credential status without preserving its message text.
+///
+/// Credential backends call this only when a native failure is exposed to their caller. A
+/// successful operation, or an expected `ERROR_NOT_FOUND` used internally to establish that a
+/// create target is absent, neither clears nor replaces the last exposed failure.
 pub fn record_last_status(status: u32) {
     LAST_STATUS.store(status as i32, Ordering::Relaxed);
 }
 
-/// Returns the most recently recorded native credential status, if any.
+/// Returns the most recently exposed failing native credential status, if any.
 pub fn credential_last_status() -> Option<i32> {
     let status = LAST_STATUS.load(Ordering::Relaxed);
     (status != NO_STATUS).then_some(status)

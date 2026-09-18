@@ -38,11 +38,19 @@ impl WindowsLaunchTarget {
     }
 
     /// Returns the persisted explicit scheme without shell-command interpretation.
+    ///
+    /// The enum variants are public for matching, so callers can construct an invalid variant
+    /// directly. The fixed `String` return type cannot represent validation failure; reject such
+    /// values here rather than serializing a value that [`Self::parse`] would refuse.
     pub fn encode(&self) -> String {
-        match self {
+        let encoded = match self {
             Self::Executable(path) => format!("exe:{}", path.display()),
             Self::Aumid(aumid) => format!("aumid:{aumid}"),
-        }
+        };
+
+        Self::parse(&encoded)
+            .expect("WindowsLaunchTarget variants must satisfy launch-target encoding invariants");
+        encoded
     }
 }
 
@@ -58,7 +66,10 @@ fn invalid_target() -> AppError {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::{
+        panic::{catch_unwind, AssertUnwindSafe},
+        path::PathBuf,
+    };
 
     use super::WindowsLaunchTarget;
 
@@ -92,6 +103,27 @@ mod tests {
             let error = WindowsLaunchTarget::parse(value).unwrap_err();
             assert_eq!(error.code(), "validation.invalid_field");
             assert_eq!(error.params.get("field"), Some(&"launch_target".to_owned()));
+        }
+    }
+
+    #[test]
+    fn encode_rejects_directly_constructed_invalid_variants() {
+        let overlong_aumid = "a".repeat(4_091);
+        let invalid_targets = [
+            WindowsLaunchTarget::Executable(PathBuf::from("chat.exe")),
+            WindowsLaunchTarget::Executable(PathBuf::from(r"C:\Apps\Chat\chat.cmd")),
+            WindowsLaunchTarget::Executable(PathBuf::from("C:\\Apps\\\0Chat\\chat.exe")),
+            WindowsLaunchTarget::Aumid(String::new()),
+            WindowsLaunchTarget::Aumid("   ".into()),
+            WindowsLaunchTarget::Aumid("Contoso\0Chat!App".into()),
+            WindowsLaunchTarget::Aumid(overlong_aumid),
+        ];
+
+        for target in invalid_targets {
+            assert!(
+                catch_unwind(AssertUnwindSafe(|| target.encode())).is_err(),
+                "invalid direct target must not serialize"
+            );
         }
     }
 }

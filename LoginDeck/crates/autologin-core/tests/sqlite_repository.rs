@@ -56,6 +56,28 @@ fn sample_application() -> ApplicationRecord {
     }
 }
 
+#[tokio::test]
+async fn windows_application_round_trips_platform_and_aumid() {
+    let repos = prepared_repositories().await;
+    let mut application = sample_application();
+    application.platform = Platform::Windows;
+    application.platform_application_id = "Contoso.Chat_abc".into();
+    application.launch_target = "aumid:Contoso.Chat_abc!App".into();
+
+    let saved = repos
+        .applications()
+        .insert(application.clone())
+        .await
+        .unwrap();
+
+    assert_eq!(saved.platform, Platform::Windows);
+    assert_eq!(saved.launch_target, "aumid:Contoso.Chat_abc!App");
+    assert_eq!(
+        repos.applications().get(saved.id).await.unwrap(),
+        Some(application)
+    );
+}
+
 fn sample_account(application_id: ApplicationId) -> ApplicationAccount {
     ApplicationAccount {
         id: ApplicationAccountId::new(),

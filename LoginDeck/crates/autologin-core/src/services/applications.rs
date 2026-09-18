@@ -898,6 +898,7 @@ impl ApplicationsService {
 fn application_identity(platform: crate::Platform, bundle_id: &str) -> (u8, String) {
     let platform = match platform {
         crate::Platform::Macos => 0,
+        crate::Platform::Windows => 1,
     };
     (platform, bundle_id.to_owned())
 }

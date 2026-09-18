@@ -4,8 +4,27 @@ use autologin_core::{
     SqliteRepositories, VaultService,
 };
 use secrecy::SecretString;
-use std::sync::{Arc, Mutex};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+};
 use tokio::sync::Notify;
+
+async fn remove_database_file(path: &Path) {
+    #[cfg(windows)]
+    for attempt in 0..10 {
+        match std::fs::remove_file(path) {
+            Ok(()) => return,
+            Err(error) if error.raw_os_error() == Some(32) && attempt < 9 => {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+            Err(error) => panic!("failed to remove SQLite test database: {error}"),
+        }
+    }
+
+    #[cfg(not(windows))]
+    std::fs::remove_file(path).unwrap();
+}
 
 #[derive(Default)]
 struct Store {
@@ -83,7 +102,7 @@ async fn interrupted_keychain_write_is_recovered_after_database_reopen() {
         .is_empty());
     drop(vault);
     drop(repos);
-    std::fs::remove_file(path).unwrap();
+    remove_database_file(&path).await;
 }
 
 #[tokio::test]

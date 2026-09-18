@@ -43,6 +43,18 @@ fn locale_serializes_with_stable_wire_names() {
 }
 
 #[test]
+fn windows_platform_serializes_with_a_stable_wire_name() {
+    assert_eq!(
+        serde_json::to_string(&Platform::Windows).unwrap(),
+        "\"windows\""
+    );
+    assert_eq!(
+        serde_json::from_str::<Platform>("\"windows\"").unwrap(),
+        Platform::Windows
+    );
+}
+
+#[test]
 fn application_identity_is_platform_neutral() {
     let app = ApplicationRecord::new(
         Platform::Macos,

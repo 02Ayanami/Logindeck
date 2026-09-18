@@ -97,6 +97,7 @@ fn app(r: SqliteRow) -> Result<ApplicationRecord, AppError> {
         id: ApplicationId::from_uuid(uuid(&r, "id")?),
         platform: match text(&r, "platform")?.as_str() {
             "macos" => Platform::Macos,
+            "windows" => Platform::Windows,
             _ => return Err(AppError::new("storage.invalid_data")),
         },
         display_name,
@@ -408,6 +409,7 @@ impl ApplicationsRepository {
             .bind(x.id.as_uuid().to_string())
             .bind(match x.platform {
                 Platform::Macos => "macos",
+                Platform::Windows => "windows",
             })
             .bind(&x.display_name)
             .bind(&x.platform_application_id)
@@ -451,7 +453,7 @@ impl ApplicationsRepository {
     }
     pub async fn update(&self, x: ApplicationRecord) -> Result<ApplicationRecord, AppError> {
         validate_application_record(&x)?;
-        let r=sqlx::query("UPDATE applications SET platform=?,display_name=?,platform_application_id=?,launch_target=?,alternate_launch_targets=?,path_access_ref=?,version=?,signature_identity=?,discovery_source=?,is_present=?,is_hidden=?,icon_cache_ref=?,last_discovered_at=?,created_at=?,updated_at=? WHERE id=?").bind(match x.platform{Platform::Macos=>"macos"}).bind(&x.display_name).bind(&x.platform_application_id).bind(&x.launch_target).bind(serde_json::to_string(&x.alternate_launch_targets).map_err(|_| AppError::new("storage.invalid_data"))?).bind(&x.path_access_ref).bind(&x.version).bind(&x.signature_identity).bind(match x.discovery_source{DiscoverySource::Automatic=>"automatic",DiscoverySource::ManualImport=>"manual_import"}).bind(x.is_present).bind(x.is_hidden).bind(&x.icon_cache_ref).bind(&x.last_discovered_at).bind(&x.created_at).bind(&x.updated_at).bind(x.id.as_uuid().to_string()).execute(&self.state.pool).await.map_err(map_error)?;
+        let r=sqlx::query("UPDATE applications SET platform=?,display_name=?,platform_application_id=?,launch_target=?,alternate_launch_targets=?,path_access_ref=?,version=?,signature_identity=?,discovery_source=?,is_present=?,is_hidden=?,icon_cache_ref=?,last_discovered_at=?,created_at=?,updated_at=? WHERE id=?").bind(match x.platform{Platform::Macos=>"macos", Platform::Windows=>"windows"}).bind(&x.display_name).bind(&x.platform_application_id).bind(&x.launch_target).bind(serde_json::to_string(&x.alternate_launch_targets).map_err(|_| AppError::new("storage.invalid_data"))?).bind(&x.path_access_ref).bind(&x.version).bind(&x.signature_identity).bind(match x.discovery_source{DiscoverySource::Automatic=>"automatic",DiscoverySource::ManualImport=>"manual_import"}).bind(x.is_present).bind(x.is_hidden).bind(&x.icon_cache_ref).bind(&x.last_discovered_at).bind(&x.created_at).bind(&x.updated_at).bind(x.id.as_uuid().to_string()).execute(&self.state.pool).await.map_err(map_error)?;
         changed(r.rows_affected())?;
         Ok(x)
     }

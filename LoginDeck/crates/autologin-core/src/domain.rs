@@ -41,6 +41,7 @@ uuid_id!(LoginTemplateId);
 #[serde(rename_all = "lowercase")]
 pub enum Platform {
     Macos,
+    Windows,
 }
 
 /// The interface language selected by the user.

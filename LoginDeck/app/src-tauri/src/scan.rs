@@ -81,6 +81,7 @@ fn identity(platform: Platform, bundle: &str) -> (u8, String) {
     (
         match platform {
             Platform::Macos => 0,
+            Platform::Windows => 1,
         },
         bundle.to_owned(),
     )
@@ -373,6 +374,19 @@ impl ScanManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn platform_identities_have_a_stable_exhaustive_order() {
+        assert_eq!(
+            identity(Platform::Macos, "same.app"),
+            (0, "same.app".into())
+        );
+        assert_eq!(
+            identity(Platform::Windows, "same.app"),
+            (1, "same.app".into())
+        );
+    }
+
     fn candidate(bundle: &str) -> DiscoveredApplication {
         DiscoveredApplication {
             platform: Platform::Macos,

@@ -151,19 +151,48 @@ pub(crate) fn is_helper(value: &str) -> bool {
         .unwrap_or(value)
         .to_ascii_lowercase();
     let stem = name.strip_suffix(".exe").unwrap_or(&name);
+    // Branding, separators and architecture/helper suffixes do not make an
+    // installer/updater user-facing. A matched Start Menu shortcut is the opt-in.
+    let compact: String = stem.chars().filter(char::is_ascii_alphanumeric).collect();
+    let mut base = compact.as_str();
+    loop {
+        let trimmed = base.trim_end_matches(|ch: char| ch.is_ascii_digit());
+        let trimmed = [
+            "bootstrapper",
+            "bootstrap",
+            "helper",
+            "service",
+            "wizard",
+            "stub",
+            "arm",
+            "win",
+            "x",
+            "v",
+        ]
+        .iter()
+        .find_map(|suffix| trimmed.strip_suffix(suffix))
+        .unwrap_or(trimmed);
+        if trimmed == base {
+            break;
+        }
+        base = trimmed;
+    }
     ["unins", "uninst", "setup", "install", "update"]
         .iter()
         .any(|prefix| stem.starts_with(prefix))
         || [
+            "update",
             "updater",
-            "updater32",
-            "updater64",
-            "uninstaller",
-            "uninstall",
             "setup",
+            "install",
+            "installer",
+            "uninstall",
+            "uninstaller",
+            "unins",
+            "uninst",
         ]
         .iter()
-        .any(|suffix| stem.ends_with(suffix))
+        .any(|suffix| base.ends_with(suffix))
         || matches!(
             stem,
             "update32"
@@ -200,38 +229,99 @@ pub(crate) fn is_command_host(value: &str) -> bool {
     )
 }
 
-fn component_evidence(entry: &UninstallEntry, name: &str) -> bool {
-    let release = entry
-        .release_type
-        .as_ref()
-        .map(|value| value.value.trim().to_ascii_lowercase())
-        .unwrap_or_default();
+fn runtime_component_name(name: &str) -> bool {
+    fn version_or_arch(token: &str) -> bool {
+        matches!(
+            token,
+            "x64" | "x86" | "arm64" | "amd64" | "aarch64" | "bit" | "lts"
+        ) || (token.chars().any(|ch| ch.is_ascii_digit())
+            && token.chars().all(|ch| ch.is_ascii_digit() || ch == '.'))
+    }
+    fn tokens(value: &str) -> impl Iterator<Item = &str> {
+        value
+            .split(|ch: char| ch.is_whitespace() || matches!(ch, '-' | '(' | ')' | '[' | ']' | '_'))
+            .filter(|token| !token.is_empty())
+    }
+    let normalized = name.split_whitespace().collect::<Vec<_>>().join(" ");
+    let family_name = normalized.strip_prefix("microsoft ").unwrap_or(&normalized);
+    let known_runtime = [
+        ".net runtime",
+        "windows desktop runtime",
+        ".net desktop runtime",
+        "asp.net core runtime",
+        "asp.net core shared framework",
+        ".net host",
+        ".net host fx resolver",
+        ".net hostfxr",
+        ".net apphost pack",
+        ".net targeting pack",
+        "edge webview2 runtime",
+        "webview2 runtime",
+        "java runtime environment",
+        "vulkan run time libraries",
+    ]
+    .iter()
+    .any(|prefix| {
+        family_name.strip_prefix(prefix).is_some_and(|tail| {
+            (tail.is_empty() || tail.starts_with([' ', '-', '(']))
+                && tokens(tail).all(version_or_arch)
+        })
+    });
+    let visual_cpp = ["visual c++", "vc++"].iter().any(|prefix| {
+        family_name.strip_prefix(prefix).is_some_and(|tail| {
+            tail.starts_with(' ')
+                && tokens(tail).any(|token| matches!(token, "runtime" | "redistributable"))
+                && tokens(tail).all(|token| {
+                    version_or_arch(token)
+                        || matches!(
+                            token,
+                            "runtime" | "redistributable" | "minimum" | "additional"
+                        )
+                })
+        })
+    });
+    known_runtime || visual_cpp
+}
+
+fn component_evidence(entry: &UninstallEntry, name: &str, probe: &impl PathProbe) -> Option<bool> {
+    let release = match &entry.release_type {
+        Some(value) => text_value(value, probe)?,
+        None => String::new(),
+    };
+    let parent = match &entry.parent_key {
+        Some(value) => text_value(value, probe)?,
+        None => String::new(),
+    };
+    if release.chars().any(char::is_control) || parent.chars().any(char::is_control) {
+        return None;
+    }
+    let release = release.trim().to_ascii_lowercase();
     let name = name.to_ascii_lowercase();
-    entry.system_component == 1
-        || entry
-            .parent_key
-            .as_ref()
-            .is_some_and(|value| !value.value.trim().is_empty())
-        || [
-            "update",
-            "hotfix",
-            "security update",
-            "update rollup",
-            "service pack",
-        ]
-        .contains(&release.as_str())
-        || ["update for ", "security update ", "hotfix ", "patch for "]
+    Some(
+        entry.system_component == 1
+            || !parent.trim().is_empty()
+            || [
+                "update",
+                "hotfix",
+                "security update",
+                "update rollup",
+                "service pack",
+            ]
+            .contains(&release.as_str())
+            || ["update for ", "security update ", "hotfix ", "patch for "]
+                .iter()
+                .any(|prefix| name.starts_with(prefix))
+            || name.contains(" (kb")
+            || runtime_component_name(&name)
+            || [
+                " redistributable",
+                " targeting pack",
+                " runtime component",
+                " support component",
+            ]
             .iter()
-            .any(|prefix| name.starts_with(prefix))
-        || name.contains(" (kb")
-        || [
-            " redistributable",
-            " targeting pack",
-            " runtime component",
-            " support component",
-        ]
-        .iter()
-        .any(|marker| name.contains(marker))
+            .any(|marker| name.ends_with(marker)),
+    )
 }
 
 pub(crate) fn within(path: &Path, root: &Path) -> bool {
@@ -281,7 +371,7 @@ pub(crate) fn normalize_uninstall_entry(
         || entry.key.is_empty()
         || entry.key.len() > 1024
         || entry.key.contains(['\0', '\\', '/'])
-        || component_evidence(&entry, name)
+        || component_evidence(&entry, name, probe)?
     {
         return None;
     }
@@ -534,6 +624,11 @@ pub(crate) mod filesystem {
         info: BY_HANDLE_FILE_INFORMATION,
         _handles: Vec<OwnedHandle>,
     }
+    impl CheckedPath {
+        pub(crate) fn file_size(&self) -> u64 {
+            (u64::from(self.info.nFileSizeHigh) << 32) | u64::from(self.info.nFileSizeLow)
+        }
+    }
 
     fn checked_path(value: &str, directory: bool) -> Option<CheckedPath> {
         if !local_path(value) {
@@ -619,20 +714,23 @@ pub(crate) mod filesystem {
         {
             return None;
         }
-        let info = checked.info;
+        Some(SafeExecutable {
+            path: checked.path.clone(),
+            fingerprint: fingerprint(&checked.path, &checked.info)?,
+        })
+    }
+
+    fn fingerprint(path: &Path, info: &BY_HANDLE_FILE_INFORMATION) -> Option<String> {
         let index = (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow);
         let size = (u64::from(info.nFileSizeHigh) << 32) | u64::from(info.nFileSizeLow);
         let modified = (u64::from(info.ftLastWriteTime.dwHighDateTime) << 32)
             | u64::from(info.ftLastWriteTime.dwLowDateTime);
         let fingerprint = format!(
             "winfile-v1:{}:{:08x}:{index:016x}:{size:016x}:{modified:016x}",
-            URL_SAFE_NO_PAD.encode(path_key(&checked.path)),
+            URL_SAFE_NO_PAD.encode(path_key(path)),
             info.dwVolumeSerialNumber
         );
-        (fingerprint.len() <= MAX_SIGNATURE_BYTES).then(|| SafeExecutable {
-            path: checked.path.clone(),
-            fingerprint,
-        })
+        (fingerprint.len() <= MAX_SIGNATURE_BYTES).then_some(fingerprint)
     }
 
     pub(super) fn expand(value: &str) -> Option<String> {
@@ -723,6 +821,52 @@ pub(crate) mod filesystem {
             None
         }
     }
+
+    #[cfg(test)]
+    mod fingerprint_tests {
+        use super::*;
+
+        #[test]
+        fn fingerprint_literal_encodes_every_native_identity_component() {
+            let mut info = BY_HANDLE_FILE_INFORMATION::default();
+            info.dwVolumeSerialNumber = 1;
+            info.nFileIndexHigh = 2;
+            info.nFileIndexLow = 3;
+            info.nFileSizeHigh = 4;
+            info.nFileSizeLow = 5;
+            info.ftLastWriteTime.dwHighDateTime = 6;
+            info.ftLastWriteTime.dwLowDateTime = 7;
+            let expected = "winfile-v1:YzpcYS5leGU:00000001:0000000200000003:0000000400000005:0000000600000007";
+            assert_eq!(
+                fingerprint(Path::new(r"C:\a.exe"), &info).as_deref(),
+                Some(expected)
+            );
+            assert_eq!(
+                fingerprint(Path::new(r"c:\A.EXE"), &info).as_deref(),
+                Some(expected)
+            );
+            assert_ne!(
+                fingerprint(Path::new(r"C:\b.exe"), &info).as_deref(),
+                Some(expected)
+            );
+            for component in 0..7 {
+                let mut changed = info;
+                match component {
+                    0 => changed.dwVolumeSerialNumber += 1,
+                    1 => changed.nFileIndexHigh += 1,
+                    2 => changed.nFileIndexLow += 1,
+                    3 => changed.nFileSizeHigh += 1,
+                    4 => changed.nFileSizeLow += 1,
+                    5 => changed.ftLastWriteTime.dwHighDateTime += 1,
+                    _ => changed.ftLastWriteTime.dwLowDateTime += 1,
+                }
+                assert_ne!(
+                    fingerprint(Path::new(r"C:\a.exe"), &changed).as_deref(),
+                    Some(expected)
+                );
+            }
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -804,17 +948,21 @@ mod registry {
         })
     }
 
+    fn native_scope(scope: RegistryScope) -> (HKEY, REG_SAM_FLAGS) {
+        match scope {
+            RegistryScope::User64 => (HKEY_CURRENT_USER, KEY_WOW64_64KEY),
+            RegistryScope::User32 => (HKEY_CURRENT_USER, KEY_WOW64_32KEY),
+            RegistryScope::Machine64 => (HKEY_LOCAL_MACHINE, KEY_WOW64_64KEY),
+            RegistryScope::Machine32 => (HKEY_LOCAL_MACHINE, KEY_WOW64_32KEY),
+        }
+    }
+
     impl RegistrySource for NativeRegistry {
         fn read_scope(
             &self,
             scope: RegistryScope,
         ) -> Result<Vec<UninstallEntry>, autologin_core::AppError> {
-            let (hive, view) = match scope {
-                RegistryScope::User64 => (HKEY_CURRENT_USER, KEY_WOW64_64KEY),
-                RegistryScope::User32 => (HKEY_CURRENT_USER, KEY_WOW64_32KEY),
-                RegistryScope::Machine64 => (HKEY_LOCAL_MACHINE, KEY_WOW64_64KEY),
-                RegistryScope::Machine32 => (HKEY_LOCAL_MACHINE, KEY_WOW64_32KEY),
-            };
+            let (hive, view) = native_scope(scope);
             let mut raw = HKEY::default();
             let status = unsafe {
                 RegOpenKeyExW(
@@ -888,6 +1036,30 @@ mod registry {
             Err(discovery_error())
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn native_scope_mapping_has_exact_hives_and_view_bits() {
+            assert_eq!(
+                native_scope(RegistryScope::User64),
+                (HKEY_CURRENT_USER, KEY_WOW64_64KEY)
+            );
+            assert_eq!(
+                native_scope(RegistryScope::User32),
+                (HKEY_CURRENT_USER, KEY_WOW64_32KEY)
+            );
+            assert_eq!(
+                native_scope(RegistryScope::Machine64),
+                (HKEY_LOCAL_MACHINE, KEY_WOW64_64KEY)
+            );
+            assert_eq!(
+                native_scope(RegistryScope::Machine32),
+                (HKEY_LOCAL_MACHINE, KEY_WOW64_32KEY)
+            );
+        }
+    }
 }
 
 #[cfg(test)]
@@ -947,7 +1119,18 @@ mod tests {
                 .map(PathBuf::from)
         }
         fn expand(&self, value: &str) -> Option<String> {
-            Some(value.replace("%APPS%", r"C:\Apps"))
+            if value == "%FAIL%" {
+                return None;
+            }
+            if value == "%OVERSIZED%" {
+                return Some("x".repeat(MAX_TEXT_BYTES + 1));
+            }
+            Some(
+                value
+                    .replace("%APPS%", r"C:\Apps")
+                    .replace("%RELEASE%", "Update")
+                    .replace("%EMPTY%", ""),
+            )
         }
         fn scan_install(&self, path: &std::path::Path, _: &str) -> Option<SafeExecutable> {
             self.scans
@@ -1026,6 +1209,84 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn branded_helper_variants_require_explicit_user_shortcuts() {
+        for basename in [
+            "ChatUpdate.exe",
+            "ChatSetup64.exe",
+            "ChatInstaller.exe",
+            "chat-updater-x64.exe",
+            "ChatUninstall64.exe",
+            "ChatInstallHelper.exe",
+        ] {
+            assert!(is_helper(basename), "helper variant");
+            let target = format!(r"C:\Apps\Chat\{basename}");
+            let f = serde_json::json!({"entry":{"name":{"value":"Chat"},"location":{"value":"C:\\Apps\\Chat"}},
+                "files":[target],"directories":["C:\\Apps\\Chat"],"shortcuts":[{"name":"Chat","target":target}]});
+            let actual =
+                normalize_uninstall_entry(entry(&f["entry"]), &shortcuts(&f), &probe(&f)).unwrap();
+            assert_eq!(actual.sources, vec!["hkcu64:app", "user-programs:app.lnk"]);
+        }
+    }
+
+    #[test]
+    fn runtime_family_filters_preserve_named_user_tools() {
+        let fixtures: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/uninstall.json")).unwrap();
+        // Literal fixture groups: eight known runtime components, four user tools.
+        for (index, f) in fixtures.as_array().unwrap().iter().enumerate().skip(33) {
+            let actual = normalize_uninstall_entry(entry(&f["entry"]), &[], &probe(f));
+            assert_eq!(
+                actual.is_none(),
+                f["expected"].is_null(),
+                "runtime fixture {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn release_type_registry_string_keeps_environment_syntax_literal() {
+        let f = serde_json::json!({"entry":{"name":{"value":"Chat"},"release":{"value":"%RELEASE%","kind":"string"},"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"]});
+        assert_eq!(
+            normalize_uninstall_entry(entry(&f["entry"]), &[], &probe(&f))
+                .unwrap()
+                .target
+                .encode(),
+            r"exe:C:\Apps\Chat\chat.exe"
+        );
+    }
+
+    #[test]
+    fn release_type_expandable_update_is_excluded() {
+        let f = serde_json::json!({"entry":{"name":{"value":"Chat"},"release":{"value":"%RELEASE%","kind":"expand"},"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"]});
+        assert!(normalize_uninstall_entry(entry(&f["entry"]), &[], &probe(&f)).is_none());
+    }
+
+    #[test]
+    fn component_metadata_expansion_failure_or_overflow_rejects_entry() {
+        for field in ["release", "parent"] {
+            for value in ["%FAIL%", "%OVERSIZED%"] {
+                let mut f = serde_json::json!({"entry":{"name":{"value":"Chat"},"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"]});
+                f["entry"][field] = serde_json::json!({"value":value,"kind":"expand"});
+                assert!(normalize_uninstall_entry(entry(&f["entry"]), &[], &probe(&f)).is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn parent_component_metadata_obeys_registry_string_type() {
+        let mut f = serde_json::json!({"entry":{"name":{"value":"Chat"},"parent":{"value":"%EMPTY%","kind":"expand"},"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"]});
+        assert_eq!(
+            normalize_uninstall_entry(entry(&f["entry"]), &[], &probe(&f))
+                .unwrap()
+                .target
+                .encode(),
+            r"exe:C:\Apps\Chat\chat.exe"
+        );
+        f["entry"]["parent"]["kind"] = "string".into();
+        assert!(normalize_uninstall_entry(entry(&f["entry"]), &[], &probe(&f)).is_none());
     }
 
     #[test]
@@ -1327,6 +1588,22 @@ mod tests {
                 entries.file(&format!("data{index}.txt"));
             }
             assert!(probe.scan_install(&entries.0, "Chat").is_none());
+        }
+
+        #[test]
+        fn sole_branded_helper_in_install_location_is_not_an_app() {
+            let tree = Tree::new();
+            for basename in [
+                "ChatUpdate.exe",
+                "ChatSetup64.exe",
+                "ChatInstaller.exe",
+                "ChatUninstall64.exe",
+                "ChatInstallHelper.exe",
+            ] {
+                let path = tree.file(basename);
+                assert!(NativePathProbe.scan_install(&tree.0, "Chat").is_none());
+                fs::remove_file(path).unwrap();
+            }
         }
 
         fn junction(path: &Path, target: &Path) {

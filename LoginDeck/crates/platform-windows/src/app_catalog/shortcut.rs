@@ -135,7 +135,10 @@ mod native {
         None
     }
 
-    fn load(path: &Path, source: &str, probe: &impl PathProbe) -> Option<Shortcut> {
+    fn pin_link(
+        path: &Path,
+        probe: &impl PathProbe,
+    ) -> Option<super::super::win32::filesystem::CheckedPath> {
         if !local_path(path.to_str()?) || !path.extension()?.eq_ignore_ascii_case("lnk") {
             return None;
         }
@@ -149,7 +152,14 @@ mod native {
         probe.directory(path.parent()?.to_str()?)?;
         // Pin the link and all ancestor components while COM reads it. This closes
         // the check/load gap for a link or directory swapped to a reparse point.
-        let _checked = super::super::win32::filesystem::checked_file(path.to_str()?)?;
+        let checked = super::super::win32::filesystem::checked_file(path.to_str()?)?;
+        // The initial observation is only a fast rejection. The authoritative
+        // length comes from the same retained handle that pins the file for COM.
+        (checked.file_size() <= MAX_LINK_BYTES).then_some(checked)
+    }
+
+    fn load(path: &Path, source: &str, probe: &impl PathProbe) -> Option<Shortcut> {
+        let _checked = pin_link(path, probe)?;
         let link: IShellLinkW =
             unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER) }.ok()?;
         let persisted: IPersistFile = link.cast().ok()?;
@@ -271,6 +281,70 @@ mod native {
         use super::*;
 
         #[test]
+        fn link_size_limit_uses_pinned_metadata_after_growth_or_replacement() {
+            use crate::app_catalog::win32::SafeExecutable;
+            use std::cell::Cell;
+            struct Temp(PathBuf);
+            impl Drop for Temp {
+                fn drop(&mut self) {
+                    let _ = fs::remove_dir_all(&self.0);
+                }
+            }
+            struct ChangedLinkProbe {
+                link: PathBuf,
+                replace: bool,
+                reached: Cell<bool>,
+            }
+            impl PathProbe for ChangedLinkProbe {
+                fn directory(&self, value: &str) -> Option<PathBuf> {
+                    self.reached.set(true);
+                    if self.replace {
+                        fs::rename(&self.link, self.link.with_extension("prior")).unwrap();
+                        fs::write(&self.link, b"replacement").unwrap();
+                    }
+                    fs::OpenOptions::new()
+                        .write(true)
+                        .open(&self.link)
+                        .unwrap()
+                        .set_len(1_048_577)
+                        .unwrap();
+                    NativePathProbe.directory(value)
+                }
+                fn executable(&self, _: &str) -> Option<SafeExecutable> {
+                    panic!("size rejection must precede target resolution")
+                }
+                fn expand(&self, _: &str) -> Option<String> {
+                    None
+                }
+                fn scan_install(&self, _: &Path, _: &str) -> Option<SafeExecutable> {
+                    None
+                }
+            }
+            let tree = Temp(
+                std::env::temp_dir()
+                    .join(format!("logindeck-link-size-test-{}", uuid::Uuid::new_v4())),
+            );
+            fs::create_dir(&tree.0).unwrap();
+            for replace in [false, true] {
+                let link = tree
+                    .0
+                    .join(if replace { "replace.lnk" } else { "grow.lnk" });
+                fs::write(&link, b"small initial observation").unwrap();
+                let probe = ChangedLinkProbe {
+                    link: link.clone(),
+                    replace,
+                    reached: Cell::new(false),
+                };
+                let result = pin_link(&link, &probe);
+                assert!(probe.reached.get());
+                assert!(
+                    result.is_none(),
+                    "oversized pinned link must be rejected before COM Load"
+                );
+            }
+        }
+
+        #[test]
         fn com_link_fixture_reads_exact_target_and_rejects_arguments_without_launching() {
             struct Temp(PathBuf);
             impl Drop for Temp {
@@ -322,7 +396,13 @@ mod tests {
     fn shortcut_buffers_require_a_terminator_and_valid_utf16() {
         assert_eq!(decode_buffer(&[65, 0, 66]), Some("A".into()));
         assert_eq!(decode_buffer(&[65, 66]), None);
-        assert_eq!(decode_buffer(&[0xd800, 0]), None);
+        // The terminator is not last, so the invalid surrogate reaches decoding.
+        assert_eq!(decode_buffer(&[0xd800, 0, 0]), None);
+    }
+
+    #[test]
+    fn shortcut_valid_text_with_last_slot_terminator_is_rejected_as_saturated() {
+        assert_eq!(decode_buffer(&[65, 0]), None);
     }
 
     #[test]

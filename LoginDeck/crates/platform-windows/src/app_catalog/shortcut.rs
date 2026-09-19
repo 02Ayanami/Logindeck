@@ -150,8 +150,8 @@ mod native {
             return None;
         }
         probe.directory(path.parent()?.to_str()?)?;
-        // Pin the link and all ancestor components while COM reads it. This closes
-        // the check/load gap for a link or directory swapped to a reparse point.
+        // Pin link contents with read-data access and no write/delete sharing.
+        // Retain the guard across both the size check and the COM read.
         let checked = super::super::win32::filesystem::checked_file(path.to_str()?)?;
         // The initial observation is only a fast rejection. The authoritative
         // length comes from the same retained handle that pins the file for COM.
@@ -279,6 +279,79 @@ mod native {
     mod tests {
         use super::super::super::win32::NativePathProbe;
         use super::*;
+
+        fn mutation_is_blocked_while_link_guard_is_alive(replace: bool) {
+            struct Temp(PathBuf);
+            impl Drop for Temp {
+                fn drop(&mut self) {
+                    let _ = fs::remove_dir_all(&self.0);
+                }
+            }
+            let tree = Temp(std::env::temp_dir().join(format!(
+                "logindeck-live-link-guard-test-{}",
+                uuid::Uuid::new_v4()
+            )));
+            fs::create_dir(&tree.0).unwrap();
+            let link = tree.0.join("Chat.lnk");
+            let replacement = tree.0.join("replacement.lnk");
+            fs::write(&link, b"initial!").unwrap();
+            fs::write(&replacement, b"replacement").unwrap();
+            let guard = pin_link(&link, &NativePathProbe).unwrap();
+            assert_eq!(guard.file_size(), 8);
+            // This is the precise production interval between the authoritative
+            // bound in pin_link and IPersistFile::Load in load.
+            let result = if replace {
+                fs::rename(&replacement, &link)
+            } else {
+                fs::OpenOptions::new()
+                    .write(true)
+                    .open(&link)
+                    .and_then(|file| file.set_len(1_048_577))
+            };
+            assert!(
+                matches!(
+                    result.err().and_then(|error| error.raw_os_error()),
+                    Some(5 | 32)
+                ),
+                "mutation must be denied while the guard is retained"
+            );
+            assert_eq!(guard.file_size(), 8);
+            assert_eq!(fs::metadata(&link).unwrap().len(), 8);
+            assert_eq!(fs::read(&link).unwrap(), b"initial!");
+            // The retained guard must not lock unrelated files in this directory.
+            let sibling = tree.0.join("sibling.txt");
+            fs::write(&sibling, b"allowed").unwrap();
+            fs::rename(&sibling, tree.0.join("renamed-sibling.txt")).unwrap();
+            // Replacing the containing path must not redirect COM to a new link.
+            let moved = tree.0.with_extension("moved");
+            let move_parent = fs::rename(&tree.0, &moved);
+            if move_parent.is_ok() {
+                fs::rename(&moved, &tree.0).unwrap();
+                panic!("containing path must not be replaceable while a link is pinned");
+            }
+            drop(guard);
+            // Releasing the RAII guard restores the operation that was denied.
+            if replace {
+                fs::rename(&replacement, &link).unwrap();
+            } else {
+                fs::OpenOptions::new()
+                    .write(true)
+                    .open(&link)
+                    .unwrap()
+                    .set_len(1_048_577)
+                    .unwrap();
+            }
+        }
+
+        #[test]
+        fn link_guard_blocks_growth_until_com_read_finishes() {
+            mutation_is_blocked_while_link_guard_is_alive(false);
+        }
+
+        #[test]
+        fn link_guard_blocks_replacement_until_com_read_finishes() {
+            mutation_is_blocked_while_link_guard_is_alive(true);
+        }
 
         #[test]
         fn link_size_limit_uses_pinned_metadata_after_growth_or_replacement() {

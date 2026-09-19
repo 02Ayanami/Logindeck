@@ -599,7 +599,7 @@ pub(crate) mod filesystem {
     use windows::{
         core::PCWSTR,
         Win32::{
-            Foundation::{CloseHandle, HANDLE},
+            Foundation::{CloseHandle, GENERIC_READ, HANDLE},
             Storage::FileSystem::{
                 CreateFileW, GetDriveTypeW, GetFileInformationByHandle, GetFinalPathNameByHandleW,
                 BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT,
@@ -630,7 +630,7 @@ pub(crate) mod filesystem {
         }
     }
 
-    fn checked_path(value: &str, directory: bool) -> Option<CheckedPath> {
+    fn checked_path(value: &str, directory: bool, target_access: u32) -> Option<CheckedPath> {
         if !local_path(value) {
             return None;
         }
@@ -648,13 +648,20 @@ pub(crate) mod filesystem {
         let mut info = BY_HANDLE_FILE_INFORMATION::default();
         for (index, ancestor) in ancestors.iter().enumerate() {
             let wide: Vec<_> = ancestor.as_os_str().encode_wide().chain([0]).collect();
-            // OPEN_REPARSE_POINT inspects each component itself. Denying write/delete sharing
-            // keeps checked ancestors from being replaced or converted to junctions while held.
+            // OPEN_REPARSE_POINT inspects each component itself. Metadata-only
+            // access is sufficient for ancestor inspection, but does not enforce
+            // mutation exclusion. Pinning content requires read-data access on
+            // the final file plus no write/delete sharing for its retained lifetime.
+            let access = if index + 1 == ancestors.len() {
+                target_access
+            } else {
+                FILE_READ_ATTRIBUTES.0
+            };
             let handle = OwnedHandle(
                 unsafe {
                     CreateFileW(
                         PCWSTR(wide.as_ptr()),
-                        FILE_READ_ATTRIBUTES.0,
+                        access,
                         FILE_SHARE_READ,
                         None,
                         OPEN_EXISTING,
@@ -696,10 +703,12 @@ pub(crate) mod filesystem {
     }
 
     pub(crate) fn checked_directory(value: &str) -> Option<CheckedPath> {
-        checked_path(value, true)
+        checked_path(value, true, FILE_READ_ATTRIBUTES.0)
     }
+    /// Retain read-data access with FILE_SHARE_READ only, preventing writes or
+    /// replacement until the guard drops. Only content readers use this mode.
     pub(crate) fn checked_file(value: &str) -> Option<CheckedPath> {
-        checked_path(value, false)
+        checked_path(value, false, GENERIC_READ.0)
     }
 
     /// Versioned metadata fingerprint, NOT an Authenticode or content-integrity assertion.
@@ -708,7 +717,7 @@ pub(crate) mod filesystem {
         if is_command_host(value) || !Path::new(value).extension()?.eq_ignore_ascii_case("exe") {
             return None;
         }
-        let checked = checked_path(value, false)?;
+        let checked = checked_path(value, false, FILE_READ_ATTRIBUTES.0)?;
         if !checked.path.extension()?.eq_ignore_ascii_case("exe")
             || is_command_host(&path_key(&checked.path))
         {

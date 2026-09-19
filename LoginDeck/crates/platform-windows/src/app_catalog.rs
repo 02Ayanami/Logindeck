@@ -222,6 +222,14 @@ fn protected_package_path(path: &Path) -> bool {
 
 #[cfg(windows)]
 fn import_path(path: &Path) -> Result<DiscoveredApplication, AppError> {
+    import_path_with(path, || win32::Win32Inventory.enumerate())
+}
+
+#[cfg(windows)]
+fn import_path_with(
+    path: &Path,
+    enumerate_win32: impl FnOnce() -> SourceResult,
+) -> Result<DiscoveredApplication, AppError> {
     use std::{fs, os::windows::fs::MetadataExt};
     use win32::filesystem::{checked_directory, executable};
     const MAX_DEPTH: usize = 2;
@@ -307,6 +315,25 @@ fn import_path(path: &Path) -> Result<DiscoveredApplication, AppError> {
         }
         selected.ok_or_else(import_error)?
     };
+    // Use the same bounded validation and deterministic Win32 deduplication as
+    // automatic discovery. A failed lookup cannot establish that this file is
+    // unregistered, so do not persist a conflicting manual identity on failure.
+    let inventory = enumerate_win32().map_err(|_| discovery_error())?;
+    let selected_path = win32::path_key(&selected.path);
+    if let Some(registered) = merge_candidates(inventory, vec![])
+        .into_iter()
+        .find(|item| {
+            matches!(&item.target, WindowsLaunchTarget::Executable(path)
+            if win32::path_key(path) == selected_path)
+        })
+    {
+        // Reject a changed file observed during lookup instead of associating it
+        // with stale metadata or silently falling back to a new manual identity.
+        if registered.signature_identity != selected.fingerprint {
+            return Err(import_error());
+        }
+        return Ok(discovered(registered, DiscoverySource::ManualImport));
+    }
     let display_name = selected
         .path
         .file_stem()
@@ -494,6 +521,130 @@ mod tests {
             fn drop(&mut self) {
                 let _ = fs::remove_dir_all(&self.0);
             }
+        }
+
+        fn registration(
+            path: &Path,
+            scope: win32::RegistryScope,
+            key: &str,
+            name: &str,
+        ) -> WindowsAppCandidate {
+            let text = |value: String| {
+                Some(win32::RegistryText {
+                    value,
+                    expandable: false,
+                })
+            };
+            win32::normalize_uninstall_entry(
+                win32::UninstallEntry {
+                    scope,
+                    key: key.into(),
+                    display_name: text(name.into()),
+                    display_version: None,
+                    display_icon: text(path.to_str().unwrap().into()),
+                    install_location: None,
+                    system_component: 0,
+                    release_type: None,
+                    parent_key: None,
+                },
+                &[],
+                &win32::NativePathProbe,
+            )
+            .unwrap()
+        }
+
+        #[test]
+        fn import_reuses_automatic_identity_independent_of_name_scope_order_and_path_case() {
+            let tree = Temp::new();
+            let path = tree.file("Chat.exe");
+            let user = registration(
+                &path,
+                win32::RegistryScope::User64,
+                "FixtureUser",
+                "Registered Product",
+            );
+            let machine = registration(
+                &path,
+                win32::RegistryScope::Machine32,
+                "FixtureMachine",
+                "Other registered name",
+            );
+            let records = vec![machine, user.clone()];
+            let automatic = combine_sources(Ok(records.clone()), Ok(vec![]))
+                .unwrap()
+                .remove(0);
+            assert_eq!(automatic.platform_application_id, user.identity);
+            let case_alias = PathBuf::from(path.to_str().unwrap().to_uppercase());
+            let imported = import_path_with(&case_alias, || Ok(records.clone())).unwrap();
+            assert_eq!(
+                imported.platform_application_id,
+                automatic.platform_application_id
+            );
+            assert_eq!(imported.launch_target, automatic.launch_target);
+            assert_eq!(imported.signature_identity, automatic.signature_identity);
+            assert_eq!(imported.display_name, "Registered Product");
+            assert_eq!(imported.discovery_source, DiscoverySource::ManualImport);
+            let mut reversed = records;
+            reversed.reverse();
+            assert_eq!(
+                imported,
+                import_path_with(&tree.0, || Ok(reversed)).unwrap()
+            );
+        }
+
+        #[test]
+        fn unregistered_import_fallback_is_stable_and_does_not_merge_by_name_or_fingerprint_only() {
+            let tree = Temp::new();
+            let path = tree.file("Chat.exe");
+            let other = Temp::new();
+            let mut unrelated = registration(
+                &other.file("Chat.exe"),
+                win32::RegistryScope::User64,
+                "OtherFixture",
+                "Chat",
+            );
+            let imported = import_path_with(&path, || Ok(vec![])).unwrap();
+            // Even a claimed equal fingerprint cannot bridge a different canonical path.
+            unrelated.signature_identity = imported.signature_identity.clone();
+            let second = import_path_with(&tree.0, || Ok(vec![unrelated.clone()])).unwrap();
+            assert_eq!(imported, second);
+            assert_ne!(imported.platform_application_id, unrelated.identity);
+            assert_eq!(imported.discovery_source, DiscoverySource::ManualImport);
+            let case_alias = PathBuf::from(path.to_str().unwrap().to_uppercase());
+            assert_eq!(
+                imported,
+                import_path_with(&case_alias, || Ok(vec![])).unwrap()
+            );
+        }
+
+        #[test]
+        fn import_rejects_same_path_with_changed_fingerprint_instead_of_creating_manual_identity() {
+            let tree = Temp::new();
+            let path = tree.file("Chat.exe");
+            let registered = registration(&path, win32::RegistryScope::User64, "Fixture", "Chat");
+            fs::write(&path, b"changed inert fixture with a different size").unwrap();
+            let error = import_path_with(&path, || Ok(vec![registered])).unwrap_err();
+            assert_eq!(error.code(), "application.unsupported_import");
+            assert!(error.params.is_empty());
+        }
+
+        #[test]
+        fn import_inventory_failure_is_sanitized_and_never_falls_back_to_manual_identity() {
+            let tree = Temp::new();
+            let error = import_path_with(&tree.file("Chat.exe"), || {
+                Err(AppError::new("private-registry-detail"))
+            })
+            .unwrap_err();
+            assert_eq!(error.code(), "application.discovery_unavailable");
+            assert!(error.params.is_empty());
+            assert_eq!(
+                import_path_with(Path::new("relative.exe"), || {
+                    panic!("invalid paths must fail before inventory lookup")
+                })
+                .unwrap_err()
+                .code(),
+                "application.unsupported_import"
+            );
         }
 
         #[test]

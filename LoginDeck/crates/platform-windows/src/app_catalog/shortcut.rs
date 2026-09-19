@@ -86,7 +86,8 @@ mod native {
         },
     };
 
-    const MAX_ENTRIES: usize = 4096;
+    // Two Start Menu roots share one bounded auxiliary inventory budget.
+    const MAX_ENTRIES: usize = super::super::MAX_SOURCE_ITEMS / 2;
     const MAX_DEPTH: usize = 6;
     const MAX_LINK_BYTES: u64 = 1024 * 1024;
 

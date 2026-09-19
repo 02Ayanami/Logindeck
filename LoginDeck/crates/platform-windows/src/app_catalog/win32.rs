@@ -10,6 +10,9 @@ use std::{
 const MAX_TEXT_BYTES: usize = 8192;
 const MAX_PATH_BYTES: usize = 4000;
 const MAX_SIGNATURE_BYTES: usize = 16 * 1024;
+// Reserve an equal portion of the catalog raw-source budget for every registry
+// view, so one large scope cannot starve the other three.
+const MAX_SCOPE_ITEMS: usize = super::MAX_SOURCE_ITEMS / 4;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) enum RegistryScope {
@@ -331,7 +334,7 @@ pub(crate) fn within(path: &Path, root: &Path) -> bool {
         .is_some_and(|rest| rest.starts_with('\\'))
 }
 
-fn narrow_install_root(path: &Path) -> bool {
+pub(crate) fn narrow_install_root(path: &Path) -> bool {
     let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
         return false;
     };
@@ -349,7 +352,7 @@ fn narrow_install_root(path: &Path) -> bool {
 }
 
 /// FNV-1a 128 is only a stable non-secret identity key, never a security digest.
-fn identity_key(source: &str, path: &Path) -> String {
+pub(crate) fn identity_key(source: &str, path: &Path) -> String {
     let mut hash = 0x6c62272e07bb014262b821756295c58d_u128;
     for byte in source.bytes().chain([0]).chain(path_key(path).bytes()) {
         hash ^= u128::from(byte);
@@ -455,6 +458,7 @@ pub(crate) fn normalize_uninstall_entry(
             })
             .collect(),
         signature_identity: executable.fingerprint,
+        executable_identity: None,
         sources,
         alternate_identities: vec![],
     })
@@ -545,6 +549,7 @@ fn enumerate_sources(
             Ok(entries) => candidates.extend(
                 entries
                     .into_iter()
+                    .take(MAX_SCOPE_ITEMS)
                     .filter_map(|entry| normalize_uninstall_entry(entry, shortcuts, paths)),
             ),
             Err(_) => failed = true,
@@ -892,7 +897,6 @@ mod registry {
         },
     };
 
-    const MAX_SUBKEYS: u32 = 8192;
     const MAX_KEY_UNITS: usize = 256;
     pub(super) struct NativeRegistry;
     struct OwnedKey(HKEY);
@@ -990,7 +994,7 @@ mod registry {
             }
             let root = OwnedKey(raw);
             let mut entries = Vec::new();
-            for index in 0..=MAX_SUBKEYS {
+            for index in 0..MAX_SCOPE_ITEMS as u32 {
                 let mut name = [0u16; MAX_KEY_UNITS];
                 let mut len = name.len() as u32;
                 let status = unsafe {
@@ -1007,9 +1011,6 @@ mod registry {
                 };
                 if status == ERROR_NO_MORE_ITEMS {
                     return Ok(entries);
-                }
-                if index == MAX_SUBKEYS {
-                    return Err(discovery_error());
                 }
                 if status == ERROR_MORE_DATA {
                     continue;
@@ -1042,7 +1043,7 @@ mod registry {
                     entries.push(entry);
                 }
             }
-            Err(discovery_error())
+            Ok(entries)
         }
     }
 
@@ -1468,6 +1469,29 @@ mod tests {
             vec![r"exe:C:\Apps\Chat\chat.exe", r"exe:C:\Other\chat.exe"]
         );
         assert_eq!(result[0].sources, vec!["hkcu64:chat", "hklm64:chat"]);
+    }
+
+    #[test]
+    fn raw_registry_budget_counts_malformed_records_before_normalization() {
+        struct Source;
+        impl RegistrySource for Source {
+            fn read_scope(
+                &self,
+                scope: RegistryScope,
+            ) -> Result<Vec<UninstallEntry>, autologin_core::AppError> {
+                let f = serde_json::json!({"name":{"value":"Chat"},"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}});
+                let mut bad = entry(&f);
+                bad.scope = scope;
+                bad.display_name = None;
+                let mut items = vec![bad; 1024];
+                items.push(entry(&f));
+                Ok(items)
+            }
+        }
+        let f = serde_json::json!({"files":["C:\\Apps\\Chat\\chat.exe"]});
+        assert!(enumerate_sources(&Source, &[], &probe(&f))
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

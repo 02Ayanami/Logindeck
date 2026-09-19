@@ -16,6 +16,7 @@ zeroize = "1"
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.61.3", features = [
   "ApplicationModel",
+  "ApplicationModel_Core",
   "Foundation",
   "Foundation_Collections",
   "Management_Deployment",
@@ -23,6 +24,7 @@ windows = { version = "0.61.3", features = [
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
   "Win32_Security_Credentials",
+  "Win32_Storage_EnhancedStorage",
   "Win32_Storage_FileSystem",
   "Win32_System_Com",
   "Win32_System_DataExchange",
@@ -32,6 +34,7 @@ windows = { version = "0.61.3", features = [
   "Win32_System_Ole",
   "Win32_System_Registry",
   "Win32_System_Threading",
+  "Win32_System_WinRT",
   "Win32_UI_Shell",
   "Win32_UI_WindowsAndMessaging",
 ] }

@@ -1,0 +1,11 @@
+[
+  {"case":"normal", "family":"Contoso.Chat_abc", "full_name":"Contoso.Chat_1.0.0.0_x64__abc", "version":"1.0.0.0", "applications":[{"id":"App", "aumid":"Contoso.Chat_abc!App", "name":"Chat"}], "expected":["aumid:Contoso.Chat_abc!App"]},
+  {"case":"two applications", "family":"Contoso.Tools_abc", "full_name":"Contoso.Tools_2.0.0.0_x64__abc", "version":"2.0.0.0", "applications":[{"id":"Editor", "aumid":"Contoso.Tools_abc!Editor", "name":"Editor"},{"id":"Viewer", "aumid":"Contoso.Tools_abc!Viewer", "name":"Viewer"}], "expected":["aumid:Contoso.Tools_abc!Editor","aumid:Contoso.Tools_abc!Viewer"]},
+  {"case":"framework", "family":"Contoso.Framework_abc", "full_name":"Contoso.Framework_1.0.0.0_x64__abc", "framework":true, "applications":[{"id":"App", "aumid":"Contoso.Framework_abc!App"}], "expected":[]},
+  {"case":"resource", "family":"Contoso.Resources_abc", "full_name":"Contoso.Resources_1.0.0.0_x64__abc", "resource":true, "applications":[{"id":"App", "aumid":"Contoso.Resources_abc!App"}], "expected":[]},
+  {"case":"unavailable", "family":"Contoso.Unavailable_abc", "full_name":"Contoso.Unavailable_1.0.0.0_x64__abc", "available":false, "applications":[{"id":"App", "aumid":"Contoso.Unavailable_abc!App"}], "expected":[]},
+  {"case":"no application", "family":"Contoso.Empty_abc", "full_name":"Contoso.Empty_1.0.0.0_x64__abc", "applications":[], "expected":[]},
+  {"case":"foreign application identity", "family":"Contoso.Chat_abc", "full_name":"Contoso.Chat_1.0.0.0_x64__abc", "applications":[{"id":"App", "aumid":"Different.App_abc!App"}], "expected":[]},
+  {"case":"malformed sibling is skipped", "family":"Contoso.Chat_abc", "full_name":"Contoso.Chat_1.0.0.0_x64__abc", "applications":[{"id":"bad!App", "aumid":"Contoso.Chat_abc!bad!App"},{"id":"App", "aumid":"Contoso.Chat_abc!App", "name":"ms-resource:Unresolved"}], "expected":["aumid:Contoso.Chat_abc!App"]},
+  {"case":"packaged desktop", "family":"Contoso.Desktop_abc", "full_name":"Contoso.Desktop_1.0.0.0_x64__abc", "applications":[{"id":"Desktop", "aumid":"Contoso.Desktop_abc!Desktop", "name":"Desktop", "executable_identity":"winfile-v1:verified-fixture"}], "expected":["aumid:Contoso.Desktop_abc!Desktop"]}
+]

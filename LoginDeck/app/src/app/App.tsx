@@ -3,6 +3,7 @@ import { initializeLocale } from './i18n';
 import { AppShell, type Page } from '../components/shell/AppShell';
 import { WebsiteList } from '../features/websites/WebsiteList';
 import { ApplicationLibrary } from '../features/applications/ApplicationLibrary';
+import { SettingsPage } from '../features/settings/SettingsPage';
 import { ButtonTooltips } from '../components/ui/ButtonTooltips';
 
 export function App() {
@@ -17,6 +18,7 @@ export function App() {
       <ButtonTooltips />
       {page === 'websites' && <WebsiteList />}
       {page === 'applications' && <ApplicationLibrary />}
+      {page === 'settings' && <SettingsPage />}
     </AppShell>
   );
 }

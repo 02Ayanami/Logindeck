@@ -75,6 +75,7 @@ export type CredentialMaintenance = z.infer<typeof maintenanceSchema>;
 // Matches the bounded Windows icon facade; macOS emits a smaller PNG within this same contract.
 const iconSchema = z.string().max(1500 * 1024).regex(/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/).nullable();
 const browserCaptureSchema = z.object({ enabled: z.boolean(), revision: z.number().int(), last_connected_at: z.number().int().nullable() }).strict();
+export type BrowserCaptureSettings = z.infer<typeof browserCaptureSchema>;
 export const tauri = {
   nextAccountNumber: (scope: string) => command('next_account_number', z.number().int().positive(), { scope }),
   editWebsiteGroup: (origin: string, name: string, url: string) => command('edit_website_group', unit, { origin, name, url }),

@@ -2,7 +2,7 @@ import type { MouseEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrandMark } from '../brand/BrandMark';
 
-export type Page = 'websites' | 'applications';
+export type Page = 'websites' | 'applications' | 'settings';
 
 export type AppShellProps = {
   page: Page;
@@ -10,7 +10,7 @@ export type AppShellProps = {
   children: ReactNode;
 };
 
-const destinations: Page[] = ['websites', 'applications'];
+const destinations: Page[] = ['websites', 'applications', 'settings'];
 
 function NavigationIcon({ page }: { page: Page }) {
   if (page === 'websites') {
@@ -67,6 +67,7 @@ export function AppShell({ page, onNavigate, children }: AppShellProps) {
             <a
               href={`#${destination}`}
               key={destination}
+              className={destination === 'settings' ? 'sidebar__settings' : undefined}
               aria-current={page === destination ? 'page' : undefined}
               onClick={(event) => navigate(event, destination)}
             >

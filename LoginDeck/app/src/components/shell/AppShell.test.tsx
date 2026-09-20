@@ -18,7 +18,7 @@ describe('AppShell', () => {
       'page',
     );
     expect(screen.getByText('Passwords stay on this device')).toBeVisible();
-    expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Settings' })).toBeVisible();
     expect(screen.getByText('content').closest('[data-layout]')).toHaveAttribute(
       'data-layout',
       'desktop',
@@ -35,5 +35,8 @@ describe('AppShell', () => {
 
     await userEvent.click(screen.getByRole('link', { name: 'Application accounts' }));
     expect(onNavigate).toHaveBeenCalledWith('applications');
+
+    await userEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    expect(onNavigate).toHaveBeenCalledWith('settings');
   });
 });

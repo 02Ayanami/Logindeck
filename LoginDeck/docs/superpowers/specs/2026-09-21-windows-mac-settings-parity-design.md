@@ -2,7 +2,12 @@
 
 ## Status
 
-Approved direction in conversation on 2026-09-21. This design uses the currently installed macOS
+Deferred after scope was narrowed in conversation on 2026-09-21. The current implementation restores
+the shared Settings navigation and page only; Windows native-messaging installation remains future
+work. This design is retained as that future parity proposal, not as the acceptance contract for the
+UI-only change.
+
+The proposal uses the currently installed macOS
 application as the product baseline: LoginDeck has a Settings destination anchored at the bottom of
 the sidebar, with Language and Edge login detection controls. A later source cleanup removed that
 destination; this work restores the macOS behavior and makes it functional on Windows rather than
@@ -215,4 +220,3 @@ value.
 
 The macOS installer path and native-host registration remain stable. Windows installation adds only
 application-owned files and the one HKCU registration key described above.
-

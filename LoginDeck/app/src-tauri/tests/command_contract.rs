@@ -44,11 +44,39 @@ fn registers_exactly_the_desktop_foundation_command_surface() {
         .filter(|name| !name.is_empty())
         .collect::<Vec<_>>();
     assert_eq!(registered, expected);
-    for forbidden in ["verify_and_launch", "shell", "clipboard", "http", "fs"] {
+    for forbidden in [
+        "verify_and_launch",
+        "shell",
+        "clipboard",
+        "http",
+        "fs",
+        "fill",
+        "switch",
+        "login",
+    ] {
         assert!(
             !handler.contains(forbidden),
             "unexpected command capability: {forbidden}"
         );
+    }
+}
+
+#[test]
+fn historical_automatic_login_modules_are_not_compiled_by_the_desktop() {
+    let root = include_str!("../src/lib.rs");
+    let commands = include_str!("../src/commands/mod.rs");
+    for source in [root, commands] {
+        for forbidden in [
+            "mod fill",
+            "mod login",
+            "mod workflow",
+            "platform_runtime::login",
+        ] {
+            assert!(
+                !source.contains(forbidden),
+                "compiled automatic login: {forbidden}"
+            );
+        }
     }
 }
 

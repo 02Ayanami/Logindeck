@@ -55,7 +55,7 @@ struct Inner {
 }
 struct CandidateEntry {
     display_name: String,
-    icon_path: std::path::PathBuf,
+    icon_path: Option<std::path::PathBuf>,
     discovered: Option<DiscoveredApplication>,
     existing_ids: Vec<ApplicationId>,
 }
@@ -158,7 +158,7 @@ fn prepare_candidates(
             .collect();
         entries.push(CandidateEntry {
             display_name: app.display_name.clone(),
-            icon_path: std::path::PathBuf::from(&app.launch_target),
+            icon_path: platform_runtime::application_icon_path(app.platform, &app.launch_target),
             discovered: Some(app),
             existing_ids,
         });
@@ -169,7 +169,10 @@ fn prepare_candidates(
         };
         entries.push(CandidateEntry {
             display_name: first.display_name.clone(),
-            icon_path: std::path::PathBuf::from(&first.launch_target),
+            icon_path: platform_runtime::application_icon_path(
+                first.platform,
+                &first.launch_target,
+            ),
             discovered: None,
             existing_ids: records.into_iter().map(|record| record.id).collect(),
         });
@@ -181,7 +184,11 @@ impl ScanManager {
     pub fn snapshot(&self) -> ScanSnapshot {
         self.0.lock().unwrap().snapshot.clone()
     }
-    pub fn candidate_path(&self, id: u64, token: usize) -> Result<std::path::PathBuf, AppError> {
+    pub fn candidate_path(
+        &self,
+        id: u64,
+        token: usize,
+    ) -> Result<Option<std::path::PathBuf>, AppError> {
         let inner = self.0.lock().unwrap();
         if inner.snapshot.id != id || inner.snapshot.phase != ScanPhase::Choosing {
             return Err(AppError::new("storage.conflict"));
@@ -496,6 +503,31 @@ mod tests {
         });
     }
     #[test]
+    #[cfg(target_os = "windows")]
+    fn windows_scan_icon_paths_keep_executables_and_never_convert_aumids_to_paths() {
+        tauri::async_runtime::block_on(async {
+            let mut executable = candidate("Editor");
+            executable.platform = Platform::Windows;
+            executable.launch_target = r"exe:C:\Apps\Editor.exe".into();
+            let mut packaged = candidate("Package");
+            packaged.platform = Platform::Windows;
+            packaged.launch_target = "aumid:Contoso.Chat_abc!App".into();
+            let manager = ScanManager::default();
+            let initial = manager.start_work(
+                async { Ok((vec![executable, packaged], vec![])) },
+                Duration::from_secs(1),
+            );
+            assert!(settled(&manager).await.phase == ScanPhase::Choosing);
+            assert_eq!(
+                manager.candidate_path(initial.id, 0).unwrap(),
+                Some(std::path::PathBuf::from(r"C:\Apps\Editor.exe"))
+            );
+            assert_eq!(manager.candidate_path(initial.id, 1).unwrap(), None);
+            assert!(manager.candidate_path(initial.id, 2).is_err());
+        });
+    }
+
+    #[test]
     fn discovery_waits_for_selection_and_rejects_stale_duplicate_and_invalid_tokens() {
         tauri::async_runtime::block_on(async {
             let manager = ScanManager::default();
@@ -505,10 +537,13 @@ mod tests {
             );
             assert!(settled(&manager).await.phase == ScanPhase::Choosing);
             assert_eq!(manager.snapshot().candidates.len(), 2);
+            #[cfg(target_os = "macos")]
             assert_eq!(
                 manager.candidate_path(initial.id, 0).unwrap(),
-                std::path::PathBuf::from("/Applications/new.app")
+                Some(std::path::PathBuf::from("/Applications/new.app"))
             );
+            #[cfg(target_os = "windows")]
+            assert_eq!(manager.candidate_path(initial.id, 0).unwrap(), None);
             assert!(manager.candidate_path(initial.id + 1, 0).is_err());
             let duplicate =
                 manager.start_work(async { Ok((vec![], vec![])) }, Duration::from_secs(1));

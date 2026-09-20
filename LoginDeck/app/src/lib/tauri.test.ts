@@ -40,7 +40,7 @@ it('accepts only strict safe application DTOs and never signature or secret fiel
   invokeMock.mockResolvedValueOnce([{ ...application, accounts: [{ id: application.id, application_id: application.id, display_name: 'a', username: 'u', password_credential_ref: 'opaque', auto_submit_enabled: false, last_login_status: null, last_login_at: null, created_at: '1726099200', updated_at: '1726099200' }] }]); await expect(tauri.listApplications()).rejects.toMatchObject({ code: 'internal.error' });
 });
 it('uses the registered dialog wire and treats cancellation as a non-error', async () => {
-  invokeMock.mockResolvedValueOnce(null); await expect(tauri.pickApplicationBundle()).resolves.toBeUndefined(); expect(invokeMock).toHaveBeenCalledWith('plugin:dialog|open', { options: { multiple: false, directory: false, filters: [{ name: 'Application', extensions: ['app'] }] } });
+  invokeMock.mockResolvedValueOnce(null); await expect(tauri.pickApplicationBundle()).resolves.toBeUndefined(); expect(invokeMock).toHaveBeenCalledWith('plugin:dialog|open', { options: { multiple: false, directory: false, filters: [{ name: 'Application', extensions: ['app', 'exe'] }] } });
 });
 
 it('grants only scoped HTTP(S) opening, without filesystem or shell permissions', async () => {
@@ -77,4 +77,37 @@ it('reads scan icons only through a task id and candidate token', async () => {
 it('accepts the macOS login keychain credential backend', async () => {
  invokeMock.mockResolvedValueOnce({ pending_count: 0, storage_backend: 'login_keychain', last_os_status: null, last_error: null });
  await expect(tauri.getCredentialMaintenance()).resolves.toMatchObject({ storage_backend: 'login_keychain' });
+});
+
+it.each(['exe:C:\\Apps\\Editor.exe', 'aumid:Contoso.Chat_abc!App'])('accepts a Windows application without interpreting its target: %s', async (target) => {
+ invokeMock.mockResolvedValueOnce([{ ...application, platform: 'windows', launch_target: target, alternate_launch_targets: [] }]);
+ await expect(tauri.listApplications()).resolves.toMatchObject([{ platform: 'windows', launchTarget: target }]);
+ invokeMock.mockResolvedValueOnce([{ ...application, platform: 'untrusted' }]);
+ await expect(tauri.listApplications()).rejects.toMatchObject({ code: 'internal.error' });
+});
+
+it('accepts the Windows Credential Manager backend but rejects unknown backends', async () => {
+ const status = { pending_count: 0, storage_backend: 'windows_credential_manager', last_os_status: 5, last_error: null };
+ invokeMock.mockResolvedValueOnce(status);
+ await expect(tauri.getCredentialMaintenance()).resolves.toEqual(status);
+ invokeMock.mockResolvedValueOnce({ ...status, storage_backend: 'untrusted' });
+ await expect(tauri.getCredentialMaintenance()).rejects.toMatchObject({ code: 'internal.error' });
+});
+
+it.each(['application.launch_failed', 'application.unsupported_target'])('preserves sanitized native launch error %s', async (code) => {
+ invokeMock.mockRejectedValueOnce({ code, params: {} });
+ await expect(tauri.launchApplication(application.id)).rejects.toMatchObject({ code, params: {} });
+ invokeMock.mockRejectedValueOnce({ code, params: { path: 'private' } });
+ await expect(tauri.launchApplication(application.id)).rejects.toMatchObject({ code: 'internal.error', params: {} });
+});
+
+it('accepts the bounded Windows PNG output and rejects values beyond the native cap', async () => {
+ const prefix = 'data:image/png;base64,iVBORw0KGgo';
+ const icon = prefix + 'A'.repeat(100_000);
+ for (const readIcon of [() => tauri.getApplicationIcon(application.id), () => tauri.getScanCandidateIcon(7, 2)]) {
+  invokeMock.mockResolvedValueOnce(icon);
+  await expect(readIcon()).resolves.toBe(icon);
+  invokeMock.mockResolvedValueOnce(prefix + 'A'.repeat(1500 * 1024 - prefix.length + 1));
+  await expect(readIcon()).rejects.toMatchObject({ code: 'internal.error' });
+ }
 });

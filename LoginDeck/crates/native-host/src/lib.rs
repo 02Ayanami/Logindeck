@@ -565,7 +565,19 @@ mod lifecycle_tests {
                 assert_eq!(fake.puts.load(Ordering::SeqCst), 1);
                 drop(a);
                 drop(b);
-                std::fs::remove_dir_all(directory).unwrap();
+                // SQLx closes its worker-held SQLite handles asynchronously after pool drop.
+                // Keep the runtime alive while Windows finishes that bounded test teardown.
+                for attempt in 0..10 {
+                    match std::fs::remove_dir_all(&directory) {
+                        Ok(()) => break,
+                        Err(error)
+                            if cfg!(windows) && error.raw_os_error() == Some(32) && attempt < 9 =>
+                        {
+                            tokio::time::sleep(Duration::from_millis(10)).await;
+                        }
+                        Err(error) => panic!("failed to remove native-host test database: {error}"),
+                    }
+                }
             });
     }
 }

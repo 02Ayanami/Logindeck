@@ -122,6 +122,8 @@
     "application": {
       "not_found": "未找到所请求的项目。",
       "signature_changed": "应用身份已改变。",
+      "launch_failed": "无法打开该应用。",
+      "unsupported_target": "不支持该应用的启动目标，请重新扫描或导入。",
       "unsupported_import": "不支持该导入。",
       "discovery_unavailable": "应用发现不可用。",
       "scan_timeout": "扫描超时，未保存不完整的发现结果，请重试。",

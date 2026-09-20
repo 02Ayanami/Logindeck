@@ -31,6 +31,8 @@ impl From<AppError> for CommandError {
             "clipboard.unavailable",
             "application.not_found",
             "application.signature_changed",
+            "application.launch_failed",
+            "application.unsupported_target",
             "application.unsupported_import",
             "application.discovery_unavailable",
             "storage.conflict",
@@ -97,6 +99,18 @@ mod tests {
                 serde_json::to_value(error).unwrap(),
                 serde_json::json!({"code": "validation.invalid_field", "params": {"field": field}})
             );
+        }
+    }
+
+    #[test]
+    fn native_launch_errors_keep_their_code_without_os_details() {
+        for code in [
+            "application.launch_failed",
+            "application.unsupported_target",
+        ] {
+            let error = CommandError::from(AppError::new(code).with_param("path", "private"));
+            assert_eq!(error.code, code);
+            assert!(error.params.is_empty());
         }
     }
 

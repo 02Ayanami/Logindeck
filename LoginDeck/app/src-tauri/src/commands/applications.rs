@@ -26,20 +26,27 @@ pub async fn get_application_icon(
     state: State<'_, AppState>,
 ) -> Result<Option<String>, CommandError> {
     // Only stored application IDs are accepted, never caller-supplied paths or file contents.
-    let application = state.applications.get_application(id).await?;
+    stored_application_icon_with(id, &state.applications, |application| {
+        run_icon_task(handle, move || {
+            platform_runtime::application_icon_for_record(&application)
+        })
+    })
+    .await
+}
+
+async fn stored_application_icon_with<F>(
+    id: ApplicationId,
+    applications: &autologin_core::ApplicationsService,
+    resolve: impl FnOnce(ApplicationRecord) -> F,
+) -> Result<Option<String>, CommandError>
+where
+    F: std::future::Future<Output = Result<Option<String>, CommandError>>,
+{
+    let application = applications.get_application(id).await?;
     if !application.is_present {
         return Ok(None);
     }
-    let (send, receive) = tokio::sync::oneshot::channel();
-    handle
-        .run_on_main_thread(move || {
-            let icon = platform_application_icon(std::path::Path::new(&application.launch_target));
-            let _ = send.send(icon);
-        })
-        .map_err(|_| autologin_core::AppError::new("internal.error"))?;
-    receive
-        .await
-        .map_err(|_| autologin_core::AppError::new("internal.error").into())
+    resolve(application).await
 }
 
 #[tauri::command]
@@ -49,21 +56,36 @@ pub async fn get_scan_candidate_icon(
     handle: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Option<String>, CommandError> {
-    let path = state.scan.candidate_path(id, token)?;
-    let (send, receive) = tokio::sync::oneshot::channel();
-    handle
-        .run_on_main_thread(move || {
-            let icon = platform_application_icon(&path);
-            let _ = send.send(icon);
-        })
-        .map_err(|_| autologin_core::AppError::new("internal.error"))?;
-    receive
-        .await
-        .map_err(|_| autologin_core::AppError::new("internal.error").into())
+    let Some(path) = state.scan.candidate_path(id, token)? else {
+        return Ok(None);
+    };
+    run_icon_task(handle, move || platform_runtime::application_icon(&path)).await
 }
 
-fn platform_application_icon(path: &std::path::Path) -> Option<String> {
-    platform_runtime::application_icon(path)
+async fn run_icon_task(
+    _handle: tauri::AppHandle,
+    resolve: impl FnOnce() -> Option<String> + Send + 'static,
+) -> Result<Option<String>, CommandError> {
+    // Windows catalog/COM resource lookup must not block the event loop. AppKit requires
+    // the main thread on macOS, so preserve that platform's existing execution policy.
+    #[cfg(target_os = "windows")]
+    {
+        tokio::task::spawn_blocking(resolve)
+            .await
+            .map_err(|_| autologin_core::AppError::new("internal.error").into())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let (send, receive) = tokio::sync::oneshot::channel();
+        _handle
+            .run_on_main_thread(move || {
+                let _ = send.send(resolve());
+            })
+            .map_err(|_| autologin_core::AppError::new("internal.error"))?;
+        receive
+            .await
+            .map_err(|_| autologin_core::AppError::new("internal.error").into())
+    }
 }
 
 #[derive(Clone, Serialize)]
@@ -297,6 +319,71 @@ pub async fn launch_application(
         .launch_application(id)
         .await
         .map_err(Into::into)
+}
+
+#[cfg(test)]
+mod icon_tests {
+    use super::*;
+    use autologin_core::{
+        ApplicationsService, DiscoveredApplication, DiscoverySource, Platform, SqliteRepositories,
+    };
+    use std::sync::Arc;
+
+    #[test]
+    fn stored_aumid_icon_uses_the_complete_database_record_and_skips_absent_apps() {
+        tauri::async_runtime::block_on(async {
+            let repos = SqliteRepositories::connect("sqlite::memory:")
+                .await
+                .unwrap();
+            repos.migrate().await.unwrap();
+            let service = ApplicationsService::new(
+                repos.applications(),
+                repos.application_accounts(),
+                Arc::new(platform_runtime::NativeApplicationCatalog::new()),
+            );
+            let saved = service
+                .add_discovered_applications(vec![DiscoveredApplication {
+                    platform: Platform::Windows,
+                    platform_application_id: "Contoso.Chat_abc!App".into(),
+                    display_name: "Contoso Chat".into(),
+                    launch_target: "aumid:Contoso.Chat_abc!App".into(),
+                    alternate_launch_targets: vec![],
+                    signature_identity: "opaque-package-identity".into(),
+                    version: Some("1.2.3".into()),
+                    path_access_ref: None,
+                    discovery_source: DiscoverySource::Automatic,
+                }])
+                .await
+                .unwrap()
+                .remove(0);
+            let expected = saved.clone();
+            let icon = stored_application_icon_with(saved.id, &service, |record| async move {
+                assert_eq!(record, expected);
+                Ok(Some("data:image/png;base64,fixture".into()))
+            })
+            .await
+            .unwrap();
+            assert_eq!(icon.as_deref(), Some("data:image/png;base64,fixture"));
+
+            let mut absent = saved;
+            absent.is_present = false;
+            repos.applications().update(absent.clone()).await.unwrap();
+            assert_eq!(
+                stored_application_icon_with(absent.id, &service, |_| async {
+                    panic!("absent apps must not perform native icon lookup")
+                })
+                .await
+                .unwrap(),
+                None
+            );
+            let missing = stored_application_icon_with(ApplicationId::new(), &service, |_| async {
+                panic!("unknown caller IDs must not perform native icon lookup")
+            })
+            .await
+            .unwrap_err();
+            assert_eq!(missing.code, "application.not_found");
+        });
+    }
 }
 
 #[cfg(test)]

@@ -11,7 +11,7 @@ const validationField = z.enum(['name', 'url', 'username', 'password', 'applicat
 const noParams = z.object({}).strict();
 const commandErrorSchema = z.union([
   z.object({ code: z.literal('validation.invalid_field'), params: z.object({ field: validationField }).strict() }).strict(),
-  ...['credential.denied', 'credential.cancelled', 'credential.not_found', 'credential.missing_entitlement', 'application.scan_timeout', 'application.cancelled', 'credential.unavailable', 'credential.cleanup_required', 'credential.compensation_failed', 'credential.compensation_tracking_failed', 'credential.cleanup_tracking_failed', 'clipboard.unavailable', 'application.not_found', 'application.signature_changed', 'application.unsupported_import', 'application.discovery_unavailable', 'storage.conflict', 'storage.referential_integrity', 'storage.not_found', 'storage.database', 'platform.unsupported', 'extension.setup_failed', 'extension.setup_conflict', 'extension.resources_missing', 'extension.edge_unavailable', 'internal.error'].map((code) => z.object({ code: z.literal(code), params: noParams }).strict()),
+  ...['credential.denied', 'credential.cancelled', 'credential.not_found', 'credential.missing_entitlement', 'application.scan_timeout', 'application.cancelled', 'credential.unavailable', 'credential.cleanup_required', 'credential.compensation_failed', 'credential.compensation_tracking_failed', 'credential.cleanup_tracking_failed', 'clipboard.unavailable', 'application.not_found', 'application.signature_changed', 'application.launch_failed', 'application.unsupported_target', 'application.unsupported_import', 'application.discovery_unavailable', 'storage.conflict', 'storage.referential_integrity', 'storage.not_found', 'storage.database', 'platform.unsupported', 'extension.setup_failed', 'extension.setup_conflict', 'extension.resources_missing', 'extension.edge_unavailable', 'internal.error'].map((code) => z.object({ code: z.literal(code), params: noParams }).strict()),
 ]);
 export type CommandError = z.infer<typeof commandErrorSchema>;
 
@@ -44,7 +44,7 @@ const accountWireSchema = z.object({ id: uuid, application_id: uuid, display_nam
 export type ApplicationAccount = z.infer<typeof accountWireSchema>;
 const pathSchema = boundedText(4096).refine((value) => value.trim().length > 0);
 const applicationWireSchema = z.object({
-  id: uuid, platform: z.literal('macos'), display_name: boundedText(256), platform_application_id: boundedText(512), launch_target: pathSchema,
+  id: uuid, platform: z.enum(['macos', 'windows']), display_name: boundedText(256), platform_application_id: boundedText(512), launch_target: pathSchema,
   alternate_launch_targets: z.array(pathSchema).max(32), version: boundedText(256).nullable(), discovery_source: z.enum(['automatic', 'manual_import']),
   is_present: z.boolean(), last_discovered_at: timestamp, created_at: timestamp, updated_at: timestamp, accounts: z.array(accountWireSchema),
 }).strict().transform((x) => ({ id: x.id, platform: x.platform, displayName: x.display_name, platformApplicationId: x.platform_application_id, launchTarget: x.launch_target, alternateLaunchTargets: x.alternate_launch_targets, version: x.version, discoverySource: x.discovery_source, isPresent: x.is_present, lastDiscoveredAt: x.last_discovered_at, createdAt: x.created_at, updatedAt: x.updated_at, accounts: x.accounts }));
@@ -70,8 +70,10 @@ const scanCandidateSchema = z.object({ token: z.number().int().nonnegative(), di
 export type ScanCandidate = z.infer<typeof scanCandidateSchema>;
 const scanSchema = z.object({ id: z.number().int().nonnegative(), phase: z.enum(['idle', 'scanning', 'choosing', 'cancelling', 'committing', 'completed', 'cancelled', 'failed']), started_at: z.number().nullable(), count: z.number().int().nonnegative().nullable(), candidates: z.array(scanCandidateSchema).max(4096).default([]), error: commandErrorSchema.nullable() }).strict();
 export type ScanStatus = z.infer<typeof scanSchema>;
-const maintenanceSchema = z.object({ pending_count: z.number().int().nonnegative(), storage_backend: z.literal('login_keychain'), last_os_status: z.number().int().nullable(), last_error: commandErrorSchema.nullable() }).strict();
+const maintenanceSchema = z.object({ pending_count: z.number().int().nonnegative(), storage_backend: z.enum(['login_keychain', 'windows_credential_manager']), last_os_status: z.number().int().nullable(), last_error: commandErrorSchema.nullable() }).strict();
 export type CredentialMaintenance = z.infer<typeof maintenanceSchema>;
+// Matches the bounded Windows icon facade; macOS emits a smaller PNG within this same contract.
+const iconSchema = z.string().max(1500 * 1024).regex(/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/).nullable();
 const browserCaptureSchema = z.object({ enabled: z.boolean(), revision: z.number().int(), last_connected_at: z.number().int().nullable() }).strict();
 export const tauri = {
   nextAccountNumber: (scope: string) => command('next_account_number', z.number().int().positive(), { scope }),
@@ -85,8 +87,8 @@ export const tauri = {
   listWebsites: () => command('list_websites', z.array(websiteWireSchema)), saveWebsite: (request: SaveWebsiteRequest) => command('save_website', websiteWireSchema, { request }), deleteWebsite: (id: string) => command('delete_website', unit, { id }),
   copyWebsiteUsername: (id: string) => command('copy_website_username', boundedText(512).min(1), { id }), copyWebsitePassword: (id: string) => command('copy_website_password', unit, { id }),
   getSettings: () => command('get_settings', settingsSchema), setLocale: (locale: Locale) => command('set_locale', settingsSchema, { locale }),
-  getApplicationIcon: (id: string) => command('get_application_icon', z.string().max(90000).regex(/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/).nullable(), { id }),
-  getScanCandidateIcon: (id: number, token: number) => command('get_scan_candidate_icon', z.string().max(90000).regex(/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/).nullable(), { id, token }),
+  getApplicationIcon: (id: string) => command('get_application_icon', iconSchema, { id }),
+  getScanCandidateIcon: (id: number, token: number) => command('get_scan_candidate_icon', iconSchema, { id, token }),
   listApplications: () => command('list_applications', z.array(applicationWireSchema)),
   rescanApplications: () => command('rescan_applications', scanSchema),
   getScanStatus: () => command('get_scan_status', scanSchema),
@@ -100,5 +102,5 @@ export const tauri = {
   copyApplicationUsername: (id: string) => command('copy_application_username', boundedText(512).min(1), { id }),
   copyApplicationPassword: (id: string) => command('copy_application_password', unit, { id }),
   launchApplication: (id: string) => command('launch_application', unit, { id }),
-  pickApplicationBundle: () => pickPath({ directory: false, filters: [{ name: 'Application', extensions: ['app'] }] }),
+  pickApplicationBundle: () => pickPath({ directory: false, filters: [{ name: 'Application', extensions: ['app', 'exe'] }] }),
 };

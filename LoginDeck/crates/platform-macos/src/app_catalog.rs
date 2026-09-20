@@ -1858,6 +1858,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(target_os = "macos")]
     async fn automatic_discovery_keeps_only_user_installed_application_roots() {
         let home_app = home_applications().unwrap().join("Custom.app");
         let source = FixtureSource {
@@ -1977,6 +1978,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn dedupe_collapses_canonical_symlink_aliases() {
         use std::{fs, os::unix::fs::symlink};
         use uuid::Uuid;

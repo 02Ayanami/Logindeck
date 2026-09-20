@@ -122,6 +122,8 @@
     "application": {
       "not_found": "The requested item was not found.",
       "signature_changed": "The application identity changed.",
+      "launch_failed": "The application could not be opened.",
+      "unsupported_target": "This application launch target is not supported. Scan or import it again.",
       "unsupported_import": "That import is not supported.",
       "discovery_unavailable": "Application discovery is unavailable.",
       "scan_timeout": "Scanning timed out. No incomplete discovery results were saved. Please try again.",

@@ -20,7 +20,7 @@ pub struct AppState {
     pub clipboard: Arc<ClipboardSession<NativeClipboard>>,
 }
 
-/// The macOS login keychain enforces the current user-session boundary.
+/// The native credential backend enforces the current user-session boundary.
 pub struct SystemCredentialPresence;
 #[async_trait]
 impl UserPresence for SystemCredentialPresence {

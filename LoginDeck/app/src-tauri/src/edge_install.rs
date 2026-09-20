@@ -43,7 +43,7 @@ fn copy_tree(source: &Path, target: &Path) -> Result<(), AppError> {
     }
     Ok(())
 }
-fn replace_file(path: &Path, bytes: &[u8], executable: bool) -> Result<(), AppError> {
+fn replace_file(path: &Path, bytes: &[u8], _executable: bool) -> Result<(), AppError> {
     let temporary = path.with_extension("installing");
     // Only fixed app-owned paths are used. Do not follow a pre-existing temporary symlink.
     if temporary.exists() || fs::symlink_metadata(&temporary).is_ok() {
@@ -56,7 +56,7 @@ fn replace_file(path: &Path, bytes: &[u8], executable: bool) -> Result<(), AppEr
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt;
-            options.mode(if executable { 0o700 } else { 0o600 });
+            options.mode(if _executable { 0o700 } else { 0o600 });
         }
         let mut file = options.open(&temporary).map_err(failure)?;
         file.write_all(bytes).map_err(failure)?;

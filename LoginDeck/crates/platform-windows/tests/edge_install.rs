@@ -217,6 +217,23 @@ fn reparse_point_install_root_is_rejected_when_symlink_creation_is_available() {
 }
 
 #[test]
+fn reparse_point_in_bundled_extension_is_rejected_when_symlink_creation_is_available() {
+    use std::os::windows::fs::symlink_dir;
+
+    let fixture = Fixture::new();
+    let external = fixture.root.parent().unwrap().join("external");
+    fs::create_dir_all(&external).unwrap();
+    if symlink_dir(&external, fixture.bundle.join("extension/linked")).is_err() {
+        return;
+    }
+    assert_eq!(
+        fixture.install().unwrap_err().code(),
+        "extension.resources_missing"
+    );
+    assert!(!fixture.root.join("edge-extension.installing").exists());
+}
+
+#[test]
 #[ignore = "writes the production current-user Edge registration and LoginDeck app-data paths"]
 fn production_bundle_install_smoke() {
     let bundled =

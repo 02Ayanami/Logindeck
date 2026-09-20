@@ -15,7 +15,9 @@ Artifacts:
 - `target/debug/bundle/msi/LoginDeck_0.1.0_x64_en-US.msi`
 - `target/debug/bundle/nsis/LoginDeck_0.1.0_x64-setup.exe`
 
-The rebuilt desktop was launched successfully as a responsive `LoginDeck` window.
+The rebuilt desktop was launched successfully as a responsive `LoginDeck` window. After the user
+loaded the unpacked extension and enabled Edge login detection, system-side verification found the
+desktop and `autologin-native-host.exe` running concurrently (native host PID 119352).
 
 ## Production registration smoke test
 
@@ -36,10 +38,11 @@ then created the roaming-data registration successfully.
 
 ## Remaining live acceptance
 
-Loading the unpacked extension into stable Edge, saving a synthetic HTTPS credential through the
-confirmation flow, checking Windows Credential Manager, and verifying the disabled-state rejection
-remain pending. Installing a browser extension requires explicit action-time user confirmation, and
-the available Windows UI-control channel did not expose native application windows in this run.
+Loading the unpacked extension into stable Edge and establishing the real native connection passed.
+Saving a synthetic HTTPS credential through the confirmation flow, checking Windows Credential
+Manager, and verifying the disabled-state rejection remain pending because they require a controlled
+test website/login fixture. The available Windows UI-control channel did not expose native
+application windows in this run.
 
 Release gaps remain unchanged: Edge Add-ons publication, code signing, installer execution, and a
 real Windows 10 22H2 run are not claimed by this record.

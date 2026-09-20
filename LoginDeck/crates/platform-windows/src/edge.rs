@@ -150,7 +150,7 @@ fn copy_tree(source: &Path, target: &Path) -> Result<(), AppError> {
         let entry = entry.map_err(missing)?;
         let kind = entry.file_type().map_err(missing)?;
         let destination = target.join(entry.file_name());
-        if kind.is_symlink() {
+        if kind.is_symlink() || is_reparse(&entry.path())? {
             return Err(missing("linked extension resource"));
         } else if kind.is_dir() {
             copy_tree(&entry.path(), &destination)?;
@@ -428,7 +428,7 @@ fn shell_open(target: &str, parameters: Option<&str>) -> Result<(), AppError> {
 pub fn open_extensions() -> Result<(), AppError> {
     #[cfg(target_os = "windows")]
     {
-        shell_open("microsoft-edge:edge://extensions/", None)
+        shell_open("msedge.exe", Some("edge://extensions/"))
     }
     #[cfg(not(target_os = "windows"))]
     {

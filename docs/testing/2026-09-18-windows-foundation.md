@@ -26,7 +26,7 @@ the local successful run used Node 24.19.0 and does not prove the Node 22 hosted
 ## Canonical verification
 
 Product root on this host:
-`C:\Users\<user>\.codex\worktrees\windows-foundation\LoginDeck\LoginDeck`.
+`<workspace>\LoginDeck`.
 The outer Git root contains that nested `LoginDeck` directory.
 
 ```powershell
@@ -169,7 +169,7 @@ activation, Windows 10 test or native macOS test is claimed.
 
 ## Artifacts
 
-Absolute product root: `C:\Users\<user>\.codex\worktrees\windows-foundation\LoginDeck\LoginDeck`.
+Product root used for the run: `<workspace>\LoginDeck`.
 The following paths are relative to that root and identify local debug outputs, not installed apps.
 Hashes below are SHA-256 and are refreshed after the final canonical build.
 

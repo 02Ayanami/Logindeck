@@ -25,7 +25,7 @@ The opt-in production installer smoke test passed using the bundled resources. T
 key is `HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.autologin.native`. Its default value
 points to:
 
-`C:\Users\<user>\AppData\Roaming\com.autologin.desktop\native-host\com.autologin.native.json`
+`%APPDATA%\com.autologin.desktop\native-host\com.autologin.native.json`
 
 The parsed manifest has name `com.autologin.native`, type `stdio`, exactly one allowed origin
 (`chrome-extension://afklnhhancnomdifldifpmdgklflbigi/`), and an existing absolute executable at
@@ -51,7 +51,7 @@ Release gaps remain unchanged for Edge Add-ons publication, code signing, and a 
 
 After explicit user confirmation, `LoginDeck_0.1.0_x64-setup.exe /S` completed with exit code 0.
 The installer created the current-user installation at
-`C:\Users\<user>\AppData\Local\LoginDeck`, an uninstaller, an uninstall-registry entry reporting
+`%LOCALAPPDATA%\LoginDeck`, an uninstaller, an uninstall-registry entry reporting
 version `0.1.0`, and the current-user Start Menu shortcut `LoginDeck.lnk`.
 
 The installed application contains both `edge\extension\manifest.json` and

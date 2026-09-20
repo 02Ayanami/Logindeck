@@ -31,7 +31,7 @@ describe('Tauri boundary', () => {
 
 });
 
-const application = { id: '550e8400-e29b-41d4-a716-446655440000', platform: 'macos', display_name: 'Example', platform_application_id: 'com.example.app', launch_target: '/Applications/Example.app', alternate_launch_targets: ['/Users/a/Applications/Example.app'], version: null, discovery_source: 'automatic', is_present: true, last_discovered_at: '1726099200', created_at: '1726099200', updated_at: '1726099200', accounts: [] };
+const application = { id: '550e8400-e29b-41d4-a716-446655440000', platform: 'macos', display_name: 'Example', platform_application_id: 'com.example.app', launch_target: '/Applications/Example.app', alternate_launch_targets: ['/Users/alice/Applications/Example.app'], version: null, discovery_source: 'automatic', is_present: true, last_discovered_at: '1726099200', created_at: '1726099200', updated_at: '1726099200', accounts: [] };
 it('accepts only strict safe application DTOs and never signature or secret fields', async () => {
   invokeMock.mockResolvedValue([application]); await expect(tauri.listApplications()).resolves.toHaveLength(1);
   invokeMock.mockResolvedValueOnce([{ ...application, launch_target: '' }]); await expect(tauri.listApplications()).rejects.toMatchObject({ code: 'internal.error' });

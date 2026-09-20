@@ -63,9 +63,8 @@ machine-wide registration and automatic extension installation remain outside th
 
 ## Verification
 
-macOS keeps `./scripts/verify-macos.sh` and its existing workflow definition. That definition lives
-under `LoginDeck/.github/workflows` in this outer Git checkout and is not relocated by this task;
-GitHub only discovers workflows in the outer root `.github/workflows`. Windows requires Windows 10 22H2
+macOS keeps `./scripts/verify-macos.sh`; both platform workflows live in the repository-root
+`.github/workflows` directory recognized by GitHub. Windows requires Windows 10 22H2
 or Windows 11 x64, native x64 PowerShell 5.1+, Rust 1.89.0 MSVC with rustfmt, Visual Studio 2022
 C++ build tools and Windows SDK, WebView2 Runtime, Node.js 22 and Corepack/pnpm 11.19.0.
 
@@ -73,7 +72,7 @@ C++ build tools and Windows SDK, WebView2 Runtime, Node.js 22 and Corepack/pnpm 
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-windows.ps1
 ```
 
-The script resolves the nested product root relative to itself, honors the application package-manager
+The script resolves the repository root relative to itself, honors the application package-manager
 pin, prepares ignored resources for clean checkouts, runs every workspace target and native test
 serially, runs script/frontend checks and creates the full Tauri debug bundles. Native failures stop
 verification with their exit code. No interactive native test is silently removed for CI.

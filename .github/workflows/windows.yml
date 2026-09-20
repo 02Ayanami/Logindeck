@@ -19,7 +19,6 @@ jobs:
     defaults:
       run:
         shell: powershell
-        working-directory: LoginDeck
     steps:
       - uses: actions/checkout@v4
 
@@ -43,7 +42,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ${{ steps.pnpm.outputs.store }}
-          key: windows-pnpm-11.19.0-${{ hashFiles('LoginDeck/app/pnpm-lock.yaml') }}
+          key: windows-pnpm-11.19.0-${{ hashFiles('app/pnpm-lock.yaml') }}
           restore-keys: windows-pnpm-11.19.0-
 
       - uses: dtolnay/rust-toolchain@master
@@ -52,8 +51,6 @@ jobs:
           components: rustfmt
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: LoginDeck -> target
 
       # Keep native credential, clipboard, catalog and controlled Win32 launch checks enabled.
       # An unavailable runner session must fail visibly, not become a silent test exclusion.

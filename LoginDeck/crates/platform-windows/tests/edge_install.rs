@@ -215,3 +215,12 @@ fn reparse_point_install_root_is_rejected_when_symlink_creation_is_available() {
         "extension.setup_conflict"
     );
 }
+
+#[test]
+#[ignore = "writes the production current-user Edge registration and LoginDeck app-data paths"]
+fn production_bundle_install_smoke() {
+    let bundled =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../app/src-tauri/resources/edge");
+    let extension = edge::install(&bundled).expect("install production Edge integration");
+    assert!(extension.join("manifest.json").is_file());
+}

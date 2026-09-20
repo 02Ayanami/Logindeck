@@ -109,3 +109,12 @@ fn command_responses_do_not_expose_secret_references() {
     assert!(!websites.contains("SecretRef"));
     assert!(!applications.contains("SecretRef"));
 }
+
+#[test]
+fn edge_commands_route_windows_through_the_platform_facade() {
+    let source = include_str!("../src/commands/edge.rs");
+    assert!(source.contains("platform_runtime::edge::install"));
+    assert!(source.contains("platform_runtime::edge::open_extensions"));
+    assert!(source.contains("platform_runtime::edge::reveal_extension"));
+    assert!(!source.contains("if !cfg!(target_os = \"macos\")"));
+}

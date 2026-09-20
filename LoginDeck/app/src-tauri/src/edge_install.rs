@@ -1,32 +1,41 @@
 //! Install only LoginDeck's bundled Edge integration into stable per-user paths.
+#[cfg(target_os = "macos")]
 use autologin_core::AppError;
 use serde::Serialize;
+#[cfg(target_os = "macos")]
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 
+#[cfg(target_os = "macos")]
 const HOST: &str = "com.autologin.native";
+#[cfg(target_os = "macos")]
 const EXTENSION_ID: &str = include_str!("../../../browser-extension/extension-id.txt");
 #[derive(Serialize)]
 pub struct Installation {
     pub extension_path: String,
 }
+#[cfg(target_os = "macos")]
 fn failure(_: impl std::fmt::Debug) -> AppError {
     AppError::new("extension.setup_failed")
 }
+#[cfg(target_os = "macos")]
 fn resources(_: impl std::fmt::Debug) -> AppError {
     AppError::new("extension.resources_missing")
 }
+#[cfg(target_os = "macos")]
 pub fn extension_path(home: &Path) -> PathBuf {
     home.join("Library/Application Support/LoginDeck/edge-extension")
 }
+#[cfg(target_os = "macos")]
 fn directory(path: &Path) -> Result<(), AppError> {
     if fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
         return Err(AppError::new("extension.setup_conflict"));
     }
     fs::create_dir_all(path).map_err(failure)
 }
+#[cfg(target_os = "macos")]
 fn copy_tree(source: &Path, target: &Path) -> Result<(), AppError> {
     directory(target)?;
     for entry in fs::read_dir(source).map_err(resources)? {
@@ -43,6 +52,7 @@ fn copy_tree(source: &Path, target: &Path) -> Result<(), AppError> {
     }
     Ok(())
 }
+#[cfg(target_os = "macos")]
 fn replace_file(path: &Path, bytes: &[u8], _executable: bool) -> Result<(), AppError> {
     let temporary = path.with_extension("installing");
     // Only fixed app-owned paths are used. Do not follow a pre-existing temporary symlink.
@@ -68,6 +78,7 @@ fn replace_file(path: &Path, bytes: &[u8], _executable: bool) -> Result<(), AppE
     }
     result
 }
+#[cfg(target_os = "macos")]
 pub fn install(home: &Path, bundled: &Path) -> Result<Installation, AppError> {
     let source = bundled.join("extension");
     let manifest: serde_json::Value =

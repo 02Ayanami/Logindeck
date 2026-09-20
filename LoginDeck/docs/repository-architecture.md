@@ -57,7 +57,9 @@ The shared desktop command surface remains bounded to account management, copy, 
 scan/import, settings and existing browser support. Historical macOS login modules are not
 registered as current product commands. Windows has no automatic-login facade, UI Automation,
 automatic fill or account switching. Building Edge resources does not enable Windows native
-messaging installation/capture, which remains outside this milestone.
+messaging by itself; the Settings command installs the fixed per-user host files and registers only
+`HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.autologin.native`. Store publication,
+machine-wide registration and automatic extension installation remain outside this milestone.
 
 ## Verification
 

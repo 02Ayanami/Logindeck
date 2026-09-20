@@ -18,6 +18,9 @@ here; the frontend, desktop commands and domain services remain shared.
   fallback. Package scan previews retain a placeholder until a record is saved.
 - Record/target revalidation before explicit Win32 process creation or AUMID activation, with real
   PID propagation and no shell interpretation.
+- Current-user stable Edge Native Messaging installation under the fixed LoginDeck roaming-data
+  directory, with pinned extension identity, a single allowed origin, reparse-point rejection and
+  foreign-registration preservation.
 
 `WindowsLaunchTarget` persists `exe:<absolute .exe path>` or `aumid:<AUMID>`; package identifiers
 are never treated as filesystem paths. `signature_identity` stores metadata: path, volume/file ID,
@@ -28,8 +31,9 @@ retained final read-data handle disallows ordinary write/delete sharing during p
 but verification and launch are not a system-level atomic transaction. Credential Manager also has
 no cross-process atomic create-if-absent guarantee against a non-cooperating external writer.
 
-Windows automatic login, UI Automation, automatic filling, account switching, uninstall/repair/update,
-and Edge native-messaging installation/capture are outside this foundation.
+Windows automatic login, UI Automation, automatic filling, account switching and
+uninstall/repair/update remain outside this foundation. Edge support prepares a locally bundled
+unpacked extension; it does not install from or publish to the Edge Add-ons store.
 
 ## Build and validation
 

@@ -15,18 +15,16 @@ macOS 与 Windows 本地账号密码管理工具。共用网站账号和应用�
 
 Windows 应用扫描合并 Win32 卸载注册信息和当前用户 MSIX/UWP 可启动应用，支持 `.exe` 手动导入、图标降级和启动前身份复核。身份材料是文件或包注册元数据，不是 Authenticode、发布者信任或文件内容认证；复核与进程创建也不是系统级原子事务。
 
-## 安装 Edge 插件（当前仅 macOS）
+## 安装 Edge 插件
 
-Windows 构建包含共享资源，但尚未接入 Windows Edge 本机消息安装与网页登录捕获流程。
-
-在“网站账号”页点击“浏览器插件”，直接查看安装教程。LoginDeck 自动准备插件文件和本机连接组件，无需用户使用终端。
+macOS 与 Windows 均由“设置 → Edge 登录识别”自动准备插件文件和本机连接组件。Windows 会为当前用户写入固定的 Edge Native Messaging 注册，无需手工修改注册表或运行终端。
 
 1. 打开 Edge 扩展管理页，开启“开发人员模式”。
 2. 点击“加载解压缩的扩展”，选择教程第二步显示的插件文件夹；可复制路径或打开文件夹。
 3. 从 Edge 工具栏的“扩展”菜单打开 LoginDeck。
 4. 保持 LoginDeck 运行，在插件中点击“检测连接”。
 
-插件目录通常为 `~/Library/Application Support/LoginDeck/edge-extension`，以界面显示的实际路径为准。插件只提供连接检测，完整安装教程由 LoginDeck 提供。更新插件文件后需在 Edge 重新加载插件，并刷新已打开的登录页。
+Windows 插件目录位于 `%APPDATA%\com.autologin.desktop\edge-extension`；macOS 目录以界面显示的实际路径为准。首次使用仍需在 Edge 开发人员模式中加载一次解压缩扩展；这不是扩展商店自动安装。更新插件文件后需在 Edge 重新加载插件，并刷新已打开的登录页。
 
 [中文使用说明](docs/help/edge-login-zh-CN.md) · [English guide](docs/help/edge-login-en.md)
 
@@ -65,7 +63,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-windows.ps1
 
 `app/preview.html` 是使用模拟数据和模拟本机命令的开发预览，不读取真实账号。预览中的连接灯不代表实际插件连接。
 
-桌面开发与构建前会运行 `scripts/prepare-edge-bundle.mjs`，准备 Edge 插件与本机组件资源。对外分发需要完整应用包，不能只分发桌面可执行文件。Windows 基础平台已构建本地 debug 安装包，尚未安装、签名或发布；Windows 自动登录、自动填写、账号切换和 UI Automation 均不在本阶段范围。
+桌面开发与构建前会运行 `scripts/prepare-edge-bundle.mjs`，准备 Edge 插件与本机组件资源。对外分发需要完整应用包，不能只分发桌面可执行文件。Windows 支持当前用户 Edge 本机消息注册，但安装包尚未签名或发布，也不代表扩展商店发布；Windows 自动登录、自动填写、账号切换和 UI Automation 均不在本阶段范围。
 
 ## 存储与恢复
 

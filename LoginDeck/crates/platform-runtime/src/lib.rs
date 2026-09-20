@@ -48,6 +48,7 @@ mod selected {
 
 #[cfg(target_os = "windows")]
 mod selected {
+    pub use platform_windows::edge;
     pub use platform_windows::{
         application_data_directory, application_icon, application_icon_for_record,
         credential_last_status, WindowsApplicationCatalog, WindowsClipboard,

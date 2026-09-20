@@ -44,5 +44,21 @@ Manager, and verifying the disabled-state rejection remain pending because they 
 test website/login fixture. The available Windows UI-control channel did not expose native
 application windows in this run.
 
-Release gaps remain unchanged: Edge Add-ons publication, code signing, installer execution, and a
-real Windows 10 22H2 run are not claimed by this record.
+Release gaps remain unchanged for Edge Add-ons publication, code signing, and a real Windows 10
+22H2 run.
+
+## NSIS installation acceptance
+
+After explicit user confirmation, `LoginDeck_0.1.0_x64-setup.exe /S` completed with exit code 0.
+The installer created the current-user installation at
+`C:\Users\<user>\AppData\Local\LoginDeck`, an uninstaller, an uninstall-registry entry reporting
+version `0.1.0`, and the current-user Start Menu shortcut `LoginDeck.lnk`.
+
+The installed application contains both `edge\extension\manifest.json` and
+`edge\autologin-native-host.exe`. The installed executable launched with a responsive `LoginDeck`
+window while the Edge native-host process remained active. A stop/start cycle produced another
+responsive installed window; the roaming SQLite database remained present at 106496 bytes and the
+fixed Edge registration remained present.
+
+The installer was executed but not code-signed. Uninstall behavior remains untested because the
+user retained the installed application for continued use. Windows 10 execution remains unverified.

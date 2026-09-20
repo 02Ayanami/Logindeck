@@ -2889,6 +2889,7 @@ dependencies = [
  "async-trait",
  "autologin-core",
  "base64 0.22.1",
+ "png 0.17.16",
  "secrecy",
  "serde_json",
  "tokio",

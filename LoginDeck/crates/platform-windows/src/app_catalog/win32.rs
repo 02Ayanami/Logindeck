@@ -633,6 +633,9 @@ pub(crate) mod filesystem {
         pub(crate) fn file_size(&self) -> u64 {
             (u64::from(self.info.nFileSizeHigh) << 32) | u64::from(self.info.nFileSizeLow)
         }
+        pub(crate) fn fingerprint(&self) -> Option<String> {
+            fingerprint(&self.path, &self.info)
+        }
     }
 
     fn checked_path(value: &str, directory: bool, target_access: u32) -> Option<CheckedPath> {

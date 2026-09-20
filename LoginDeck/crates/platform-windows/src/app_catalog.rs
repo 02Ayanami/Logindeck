@@ -1,4 +1,4 @@
-//! Bounded discovery/import for Windows. Verification and launch follow in Task 7.
+//! Bounded discovery/import and the sole public verified launch entry for Windows.
 
 pub(crate) mod package;
 pub(crate) mod shortcut;
@@ -205,10 +205,13 @@ impl ApplicationCatalog for WindowsApplicationCatalog {
 
     async fn verify_and_launch(
         &self,
-        _app: &ApplicationRecord,
+        app: &ApplicationRecord,
     ) -> Result<VerifiedApplication, AppError> {
-        // Intentionally cannot launch until Task 7 implements atomic revalidation.
-        Err(AppError::new("application.not_supported"))
+        crate::launch::validated_target(app)?;
+        let app = app.clone();
+        tokio::task::spawn_blocking(move || crate::launch::verify_and_launch(app))
+            .await
+            .map_err(|_| AppError::new("application.launch_failed"))?
     }
 }
 

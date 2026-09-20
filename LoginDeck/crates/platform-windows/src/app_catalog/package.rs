@@ -29,7 +29,7 @@ fn identifier(value: &str, max: usize) -> bool {
             .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, b'.' | b'_' | b'-'))
 }
 
-pub(super) fn valid_aumid(value: &str) -> bool {
+pub(crate) fn valid_aumid(value: &str) -> bool {
     value.split_once('!').is_some_and(|(family, app)| {
         identifier(family, 255) && family.contains('_') && identifier(app, 64)
     })
@@ -107,6 +107,14 @@ fn normalize_package(package: PackageRecord) -> Vec<WindowsAppCandidate> {
 }
 
 pub(crate) struct PackagedAppInventory;
+#[cfg(windows)]
+pub(crate) fn with_logo<T>(
+    aumid: &str,
+    signature: &str,
+    resolve: impl FnOnce(windows::Storage::Streams::RandomAccessStreamReference) -> Option<T>,
+) -> Option<T> {
+    native::with_logo(aumid, signature, resolve)
+}
 impl PackagedAppInventory {
     pub(crate) fn enumerate_current_user(
         &self,
@@ -297,6 +305,61 @@ mod native {
             }
         }
         Ok(candidates)
+    }
+
+    pub(super) fn with_logo<T>(
+        aumid: &str,
+        signature: &str,
+        resolve: impl FnOnce(windows::Storage::Streams::RandomAccessStreamReference) -> Option<T>,
+    ) -> Option<T> {
+        if !valid_aumid(aumid) || signature.len() > 16 * 1024 {
+            return None;
+        }
+        unsafe { RoInitialize(RO_INIT_MULTITHREADED) }.ok()?;
+        let _apartment = Apartment;
+        let manager = PackageManager::new().ok()?;
+        let packages = manager.FindPackagesByUserSecurityId(&HSTRING::new()).ok()?;
+        let iterator = packages.First().ok()?;
+        let mut remaining = MAX_SOURCE_ITEMS;
+        for index in 0..MAX_SOURCE_ITEMS {
+            if !iterator.HasCurrent().ok()? {
+                break;
+            }
+            if let Ok(package) = iterator.Current() {
+                if let Some(record) = record(&package, &mut remaining) {
+                    let matched = normalize_package(record)
+                        .into_iter()
+                        .any(|item| item.identity == aumid && item.signature_identity == signature);
+                    if matched {
+                        // Select this exact Application, not a package-wide logo. GetLogo
+                        // resolves manifest/PRI scale, targetsize and language qualifiers in Windows.
+                        let entries = package.GetAppListEntries().ok()?;
+                        for i in 0..entries.Size().ok()?.min(MAX_SOURCE_ITEMS as u32) {
+                            let Ok(entry) = entries.GetAt(i) else {
+                                continue;
+                            };
+                            if bounded(entry.AppUserModelId().ok()?, 512).as_deref() == Some(aumid)
+                            {
+                                let logo = entry
+                                    .DisplayInfo()
+                                    .ok()?
+                                    .GetLogo(windows::Foundation::Size {
+                                        Width: 64.0,
+                                        Height: 64.0,
+                                    })
+                                    .ok()?;
+                                return resolve(logo);
+                            }
+                        }
+                        return None;
+                    }
+                }
+            }
+            if remaining == 0 || index + 1 == MAX_SOURCE_ITEMS || !iterator.MoveNext().ok()? {
+                break;
+            }
+        }
+        None
     }
 }
 

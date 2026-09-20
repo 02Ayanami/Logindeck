@@ -1,7 +1,8 @@
 #![cfg(windows)]
 
 use autologin_core::{
-    ApplicationCatalog, ApplicationsService, DiscoverySource, Platform, SqliteRepositories,
+    ApplicationCatalog, ApplicationRecord, ApplicationsService, DiscoverySource, Platform,
+    SqliteRepositories,
 };
 use platform_windows::{WindowsApplicationCatalog, WindowsLaunchTarget};
 use std::{collections::HashSet, fs, path::PathBuf, sync::Arc};
@@ -19,6 +20,72 @@ impl Drop for OwnedKey {
     fn drop(&mut self) {
         let _ = unsafe { RegCloseKey(self.0) };
     }
+}
+
+#[tokio::test]
+async fn registered_launch_revalidates_identity_and_sanitizes_native_failure() {
+    let fixture = RegisteredExecutable::new();
+    let catalog = WindowsApplicationCatalog::new();
+    let found = catalog
+        .import_bundle(&fixture.executable)
+        .await
+        .unwrap()
+        .remove(0);
+    let mut app = ApplicationRecord::new(
+        found.platform,
+        found.platform_application_id,
+        found.display_name,
+    )
+    .unwrap();
+    app.launch_target = found.launch_target;
+    app.signature_identity = found.signature_identity;
+    app.discovery_source = found.discovery_source;
+    // This controlled resource is deliberately not a PE; reaching CreateProcess fails benignly.
+    let error = catalog.verify_and_launch(&app).await.unwrap_err();
+    assert_eq!(error.code(), "application.launch_failed");
+    assert!(error.params.is_empty());
+    fs::write(&fixture.executable, b"different controlled metadata").unwrap();
+    assert_eq!(
+        catalog.verify_and_launch(&app).await.unwrap_err().code(),
+        "application.signature_changed"
+    );
+    app.platform_application_id = "win32:00000000000000000000000000000000".into();
+    assert_eq!(
+        catalog.verify_and_launch(&app).await.unwrap_err().code(),
+        "application.not_found"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires an explicitly installed controlled LoginDeck.ActivationFixture package and LOGINDECK_TEST_AUMID"]
+async fn controlled_package_activation_opt_in() {
+    let aumid =
+        std::env::var("LOGINDECK_TEST_AUMID").expect("set only to a controlled fixture AUMID");
+    assert!(aumid.starts_with("LoginDeck.ActivationFixture_"));
+    let catalog = WindowsApplicationCatalog::new();
+    let found = catalog
+        .discover()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|app| app.platform_application_id == aumid)
+        .expect("controlled package must be registered for current user");
+    let mut app = ApplicationRecord::new(
+        found.platform,
+        found.platform_application_id,
+        found.display_name,
+    )
+    .unwrap();
+    app.launch_target = found.launch_target;
+    app.signature_identity = found.signature_identity;
+    assert_ne!(
+        catalog
+            .verify_and_launch(&app)
+            .await
+            .unwrap()
+            .launched_process_id,
+        0
+    );
 }
 
 /// Owns only a UUID-named test directory and a newly created HKCU registration.

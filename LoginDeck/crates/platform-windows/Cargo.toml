@@ -8,6 +8,7 @@ rust-version = "1.89"
 async-trait = "0.1"
 autologin-core = { path = "../autologin-core" }
 base64 = "0.22"
+png = "0.17.16"
 secrecy = "0.10"
 tokio = { version = "1", features = ["rt", "sync"] }
 uuid = { version = "1", features = ["v4"] }
@@ -19,10 +20,13 @@ windows = { version = "0.61.3", features = [
   "ApplicationModel_Core",
   "Foundation",
   "Foundation_Collections",
+  "Graphics_Imaging",
   "Management_Deployment",
   "Storage",
+  "Storage_Streams",
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
+  "Win32_Graphics_Imaging",
   "Win32_Security_Credentials",
   "Win32_Storage_EnhancedStorage",
   "Win32_Storage_FileSystem",
@@ -42,3 +46,7 @@ windows = { version = "0.61.3", features = [
 [dev-dependencies]
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[[test]]
+name = "launch_native"
+harness = false

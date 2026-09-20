@@ -33,6 +33,7 @@ test("public audit classifies sensitive, generated and local-path files", () => 
 });
 
 test("clearly synthetic local paths are allowed fixtures", () => {
+  assert.ok(!auditText("C:\\Users\\<user>\\AppData\\Local").includes("local-absolute-path"));
   assert.ok(!auditText("/Users/demo/Applications/Example.app").includes("local-absolute-path"));
   assert.ok(!auditText("/Users/alice/Applications/Example.app").includes("local-absolute-path"));
   assert.ok(!auditText("C:\\Users\\fixture\\AppData\\Local").includes("local-absolute-path"));

@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 
 const MAX_TEXT_BYTES = 10 * 1024 * 1024;
 const LARGE_FILE_BYTES = 10 * 1024 * 1024;
-const syntheticUsers = new Set(["a", "alice", "demo", "example", "fixture", "test", "tester", "agent"]);
+const syntheticUsers = new Set(["<user>", "a", "alice", "demo", "example", "fixture", "test", "tester", "agent"]);
 
 const secretPatterns = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,

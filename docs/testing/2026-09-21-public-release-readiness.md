@@ -35,16 +35,10 @@ matched secret value. No secret patterns, credential/signing/database files, gen
 or tracked files larger than 10 MiB were found. Current tracked files contain no non-fixture local
 absolute paths.
 
-Four historical path findings remain, all in two old test records and their former nested paths:
-
-- `docs/testing/2026-09-18-windows-foundation.md`
-- `docs/testing/2026-09-21-windows-edge-connection.md`
-- the same two paths below the historical `LoginDeck/` wrapper
-
-They disclose the former local Windows username/worktree or AppData location, but contain no secret,
-token, password, or application data. The current versions use `<workspace>`, `%APPDATA%`, and
-`%LOCALAPPDATA%`. Publishing the existing history therefore remains gated on an explicit choice:
-accept these low-risk historical paths, or authorize a history rewrite before the first push.
+The four historical local-path findings in two old test records were removed through an authorized
+history rewrite. The former Windows username is now the explicit `<user>` placeholder throughout
+reachable history. A complete pre-rewrite Git bundle was stored outside the repository for local
+recovery and is not part of the publication set. The post-rewrite audit reports zero findings.
 
 ## Remote-only verification gap
 
@@ -54,6 +48,5 @@ defaults to build-only, so it can validate both native artifacts without publish
 
 ## Publication gate
 
-Before publication, provide the destination GitHub repository and resolve the historical-path
-choice above. Repository creation, adding a remote, pushing, tagging, and releasing require a final
-explicit confirmation.
+Before publication, provide the destination GitHub repository. Repository creation, adding a
+remote, pushing, tagging, and releasing require a final explicit confirmation.

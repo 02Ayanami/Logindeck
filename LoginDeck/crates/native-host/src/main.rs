@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use platform_runtime::NativeCredentialStore;
+use platform_runtime::{application_data_directory, NativeCredentialStore};
 fn main() {
     // Native host may only be launched for this exact unpacked/store identity.
     if !std::env::args()
@@ -21,11 +21,8 @@ fn main() {
     }
 }
 fn run() -> Result<(), Box<dyn std::error::Error>> {
-    if !cfg!(target_os = "macos") {
-        return Err("unsupported platform".into());
-    }
     // No caller-controlled database path, service, shell command, or credential-read operation.
-    let directory = platform_data_directory()?;
+    let directory = application_data_directory()?;
     std::fs::create_dir_all(&directory)?;
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -108,9 +105,4 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     session.clear();
     Ok(())
-}
-
-fn platform_data_directory() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
-    let home = std::env::var_os("HOME").ok_or("home unavailable")?;
-    Ok(std::path::PathBuf::from(home).join("Library/Application Support/com.autologin.desktop"))
 }

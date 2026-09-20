@@ -4,8 +4,9 @@ LoginDeck stores account metadata locally and delegates passwords to the operati
 store. Please do not attach passwords, exported credentials, SQLite databases, application-data
 directories, access tokens, or other personal data to a public GitHub issue.
 
-For a suspected vulnerability, use this repository's **Security → Advisories → New draft security
-advisory** flow. Describe the affected version, platform, reproduction steps, and expected impact,
+For a suspected vulnerability, use this repository's **GitHub Security Advisories** flow:
+**Security → Advisories → New draft security advisory**. Describe the affected version, platform,
+reproduction steps, and expected impact,
 but replace real credentials and accounts with controlled test fixtures. A maintainer can continue
 the discussion privately inside the advisory.
 

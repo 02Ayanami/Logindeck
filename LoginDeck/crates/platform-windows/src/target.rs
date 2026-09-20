@@ -73,15 +73,21 @@ mod tests {
 
     use super::WindowsLaunchTarget;
 
+    // PathBuf absolute-path semantics belong to the host OS.
+    #[cfg(windows)]
     #[test]
-    fn target_round_trips_without_guessing() {
+    fn executable_round_trips_without_guessing() {
         let executable = WindowsLaunchTarget::Executable(PathBuf::from(r"C:\Apps\Chat\chat.exe"));
-        let aumid = WindowsLaunchTarget::Aumid("Contoso.Chat_abc!App".into());
 
         assert_eq!(
             WindowsLaunchTarget::parse(&executable.encode()).unwrap(),
             executable
         );
+    }
+
+    #[test]
+    fn aumid_round_trips_without_guessing() {
+        let aumid = WindowsLaunchTarget::Aumid("Contoso.Chat_abc!App".into());
         assert_eq!(WindowsLaunchTarget::parse(&aumid.encode()).unwrap(), aumid);
     }
 

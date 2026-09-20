@@ -1190,6 +1190,9 @@ mod tests {
             .unwrap_or_default()
     }
 
+    // Fixture encoding and install-root/parent inspection use host Path semantics.
+    // Keep these on Windows; text parsing and early-rejection tests below stay portable.
+    #[cfg(windows)]
     #[test]
     fn hand_authored_uninstall_fixtures() {
         let fixtures: Value =
@@ -1224,6 +1227,7 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     #[test]
     fn branded_helper_variants_require_explicit_user_shortcuts() {
         for basename in [
@@ -1259,6 +1263,7 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     #[test]
     fn release_type_registry_string_keeps_environment_syntax_literal() {
         let f = serde_json::json!({"entry":{"name":{"value":"Chat"},"release":{"value":"%RELEASE%","kind":"string"},"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"]});
@@ -1288,6 +1293,7 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     #[test]
     fn parent_component_metadata_obeys_registry_string_type() {
         let mut f = serde_json::json!({"entry":{"name":{"value":"Chat"},"parent":{"value":"%EMPTY%","kind":"expand"},"icon":{"value":"C:\\Apps\\Chat\\chat.exe"}},"files":["C:\\Apps\\Chat\\chat.exe"]});
@@ -1370,6 +1376,7 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     #[test]
     fn broad_locations_cannot_supply_shortcut_identity() {
         for location in [r"C:\", r"C:\Program Files", r"C:\Windows", r"C:\Users"] {
@@ -1397,6 +1404,7 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     #[test]
     fn dedup_uses_executable_and_retains_sources_not_display_name() {
         let fixture: Value =
@@ -1420,6 +1428,7 @@ mod tests {
         assert_ne!(actual[0].identity, actual[1].identity);
     }
 
+    #[cfg(windows)]
     #[test]
     fn source_boundary_requests_all_four_scopes_once_and_deduplicates() {
         use std::cell::RefCell;
@@ -1521,6 +1530,7 @@ mod tests {
         assert!(error.params.is_empty());
     }
 
+    #[cfg(windows)]
     #[test]
     fn explicit_user_facing_shortcut_can_select_helper_but_not_command_host() {
         let f = serde_json::json!({"entry":{"name":{"value":"Chat"},"location":{"value":"C:\\Apps\\Chat"}},

@@ -383,6 +383,7 @@ mod tests {
             alternate_identities: vec![],
         }
     }
+    #[cfg(windows)]
     fn win32(id: &str, name: &str, path: &str, proof: &str) -> WindowsAppCandidate {
         let mut candidate = packaged(id, name, None);
         candidate.target = WindowsLaunchTarget::Executable(path.into());
@@ -390,6 +391,8 @@ mod tests {
         candidate
     }
 
+    // These mixed-source fixtures validate/encode real Windows absolute paths.
+    #[cfg(windows)]
     #[test]
     fn merge_prefers_aumid_only_when_verified_executable_identity_matches() {
         let win = win32(
@@ -414,6 +417,7 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     #[test]
     fn merge_deduplicates_aumid_preserves_equal_names_and_orders_stably() {
         let a = packaged("Contoso.Chat_abc!App", "chat", None);
@@ -473,6 +477,7 @@ mod tests {
         assert!(error.params.is_empty());
     }
 
+    #[cfg(windows)]
     #[test]
     fn merge_bounds_raw_sources_and_final_results_and_skips_malformed_records() {
         let mut invalid = packaged("Contoso.Invalid_abc!App", "", None);

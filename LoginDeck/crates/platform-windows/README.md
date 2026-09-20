@@ -22,10 +22,11 @@ here; the frontend, desktop commands and domain services remain shared.
 `WindowsLaunchTarget` persists `exe:<absolute .exe path>` or `aumid:<AUMID>`; package identifiers
 are never treated as filesystem paths. `signature_identity` stores metadata: path, volume/file ID,
 size and last-write time for Win32; full registered package name and AUMID for packages. It is not
-an Authenticode signature, content authentication or publisher trust assertion. Read-sharing guards
-protect checked path components and the final file during process creation, but verification and
-launch are not a system-level atomic transaction. Credential Manager also has no cross-process
-atomic create-if-absent guarantee against a non-cooperating external writer.
+an Authenticode signature, content authentication or publisher trust assertion. Ancestor handles
+inspect metadata and reject reparse points; metadata-only access does not exclude mutation. The
+retained final read-data handle disallows ordinary write/delete sharing during process creation,
+but verification and launch are not a system-level atomic transaction. Credential Manager also has
+no cross-process atomic create-if-absent guarantee against a non-cooperating external writer.
 
 Windows automatic login, UI Automation, automatic filling, account switching, uninstall/repair/update,
 and Edge native-messaging installation/capture are outside this foundation.
@@ -56,6 +57,13 @@ the current user's desktop session. The controlled Win32 launch harness verifies
 arguments. `controlled_package_activation_opt_in` is intentionally ignored unless an explicitly
 installed `LoginDeck.ActivationFixture_*` package and `LOGINDECK_TEST_AUMID` are supplied; ordinary
 installed applications are not a substitute for that fixture.
+
+The crate remains a workspace member on macOS. Tests requiring Windows absolute-path, parent or
+file-name semantics are gated with `cfg(windows)`, as are native API tests. Portable AUMID, text,
+UTF-16 and error tests still run there. `tests/test_boundaries.rs` inspects Rust module/crate/function
+cfg attributes and checks the macOS-selected tests against a reviewed portable list, including the
+inert non-Windows custom launch harness. New portable tests must update that list after review.
+This source-selection check also runs on Windows; it does not replace native macOS execution.
 
 The current [verification record](../../docs/testing/2026-09-18-windows-foundation.md) covers a real
 Windows 11 x64 run, EXE/MSI/NSIS build evidence and the responsive-window startup regression.

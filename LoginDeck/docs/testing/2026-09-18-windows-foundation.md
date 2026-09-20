@@ -53,17 +53,19 @@ Strict version checks remain enabled. No `--ignore-scripts`, native-test filter,
 or package pin change was added.
 
 The first complete canonical run finished at **17:36:10 +08:00 with exit 0**, before Windows CI was
-created. The final post-change canonical run finished at **17:51:48 +08:00 with exit 0** and the
-same counts below. Only evidence timestamps/hashes and the task report were finalized afterward.
-Both logs are in the outer Git root's ignored
-`.superpowers/sdd/2026-09-18-windows-foundation/`: `task-9-local-before-ci.log` and
-`task-9-final-verification.log`. These local coordination files are not shipped with the repository.
+created. The Task 9 post-change run finished at **17:51:48 +08:00 with exit 0**; both had 236 Rust
+tests passed. After the final-review test portability correction described below, the latest full
+canonical run finished at **23:11:19 +08:00 with exit 0** and the counts below. Only documentation
+and the task report were finalized afterward. Logs are in the outer Git root's ignored
+`.superpowers/sdd/2026-09-18-windows-foundation/`: `task-9-local-before-ci.log`,
+`task-9-final-verification.log` and `final-fix-verification.log`. These local coordination files
+are not shipped with the repository.
 
 | Check | Local result |
 | --- | --- |
 | Formatting | Exit 0 |
-| Full Rust workspace/all targets, serial | 236 harness-managed passed, 0 failed, 2 intentional ignores; separate controlled Win32 launch harness passed |
-| Windows crate within workspace | 64 unit + 3 catalog + 10 clipboard + 7 credential tests passed, plus controlled launch harness |
+| Full Rust workspace/all targets, serial | 238 harness-managed passed, 0 failed, 2 intentional ignores; separate controlled Win32 launch harness passed |
+| Windows crate within workspace | 65 unit + 3 catalog + 10 clipboard + 7 credential + 1 test-boundary audit passed, plus controlled launch harness |
 | Core / desktop / runtime | 98 core; 19 desktop (15 unit + 4 contract); 3 facade tests passed |
 | Existing macOS crate on Windows | 29 non-native/fixture tests passed; this is not native macOS verification |
 | Script regressions | 8 passed: 4 resource filename, 1 Tauri wrapper, 3 Windows verifier |
@@ -78,6 +80,24 @@ two unrecognized PURE annotations in Zod and removes the comments. These warning
 the successful exit status and were not suppressed.
 
 ## Regression and CI evidence
+
+Final review found that the unconditional Windows workspace crate selected tests using Windows
+absolute-path and parent/file-name behavior on macOS. Twelve such test cases now have Windows cfg
+gates; the AUMID round-trip remains portable as a separate test. No production validation changed.
+The new `platform-windows/tests/test_boundaries.rs` source audit failed first with the twelve
+ungated selections, then passed after the correction. It parses crate/module/function cfg gates
+and every integration-test source, requiring the macOS selection to match an explicitly reviewed
+portable set. It also checks that the custom non-Windows launch harness has an empty entry point.
+The audit selects 26 portable tests on macOS and 87 tests on Windows (including the package ignore).
+It runs during the canonical workspace test stage, so new ungated tests require portability review.
+
+The macOS preflight uses `cargo test --workspace --locked`. Rust 1.89.0 `--print cfg` for both
+`x86_64-apple-darwin` and `aarch64-apple-darwin` confirms `unix`, `target_os="macos"` and no Windows
+predicate, matching the audit. Only the Windows target standard library is installed here. This
+proves source test selection for the present cfg structure; no native macOS build or execution is
+claimed. Changes to test bodies still require portability review, and macro-generated tests would
+need explicit audit support. RED/GREEN logs and the full surface audit are retained as
+`final-fix-red.log`, `final-fix-green.log` and `final-fix-report.md` in the ignored SDD directory.
 
 The verifier tests were written first: all 3 failed with ENOENT for the absent script, then all 3
 passed after implementation. They execute the real script from an unrelated cwd, copy it under a
@@ -156,9 +176,9 @@ Hashes below are SHA-256 and are refreshed after the final canonical build.
 | File | Bytes | SHA-256 |
 | --- | ---: | --- |
 | `app/src-tauri/icons/icon.ico` | 21613 | `94AE2A8D513E248DC8F1D76DA8E0588A837E9C8F65358E767155D0588A08449A` |
-| `target/debug/autologin-desktop.exe` | 21988864 | `17A7F1E79C1DFDD5740F2C4B28E06FEEBF620C657F0BD27CAAFF55633EBD0045` |
-| `target/debug/bundle/msi/LoginDeck_0.1.0_x64_en-US.msi` | 7958528 | `1598ADED1E21BCAFEB04A1904C94A5916D53D0E5B9C7241ABFAA05E420AAF294` |
-| `target/debug/bundle/nsis/LoginDeck_0.1.0_x64-setup.exe` | 5015671 | `348EF733D7CAB1362CF640B9C6FCE530A4E90AF5FD8D2767DB10A74E82E7316A` |
+| `target/debug/autologin-desktop.exe` | 21988864 | `DD3F7A15A4AD3880920A833EA98599F6B94048A0F3EE52374FD81FA2C101398D` |
+| `target/debug/bundle/msi/LoginDeck_0.1.0_x64_en-US.msi` | 7958528 | `F63ACFEBDC21496E62D4ACE7AA7CC7E441F8BABDB14F2AC4E9543D521E48B4E9` |
+| `target/debug/bundle/nsis/LoginDeck_0.1.0_x64-setup.exe` | 5012997 | `764EFAC94FCAC754E0E565EB087A098A2933FE5804C8DECB23DE5E165F5AD103` |
 
 The generated ICO retains the canonical Task 8 asset and contains six PNG-backed entries at
 32, 16, 24, 48, 64 and 256 pixels, with valid directory ranges. Frontend output is `app/dist/index.html`

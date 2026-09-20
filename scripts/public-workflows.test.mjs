@@ -23,7 +23,16 @@ test("platform verification workflows are least-privilege and architecture-speci
   assert.match(macos, /runs-on: macos-14/);
   assert.match(macos, /uname -m/);
   assert.match(macos, /arm64/);
-  assert.match(macos, /cargo test --workspace --locked/);
+  for (const packageName of [
+    "autologin-core",
+    "platform-macos",
+    "platform-windows",
+    "platform-runtime",
+    "autologin-native-host",
+    "autologin-desktop",
+  ]) {
+    assert.match(macos, new RegExp(`cargo test -p ${packageName} --locked`));
+  }
   assert.match(macos, /pnpm --dir app test --run/);
   assert.match(macos, /node --test tests\/\*\.test\.mjs/);
   assert.match(macos, /git diff --exit-code/);

@@ -50,8 +50,18 @@ jobs:
         run: pnpm --dir app sync-version
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
-      - name: Test Rust workspace
-        run: cargo test --workspace --locked
+      - name: Test shared Rust core
+        run: cargo test -p autologin-core --locked
+      - name: Test macOS platform
+        run: cargo test -p platform-macos --locked
+      - name: Test reviewed Windows portable boundary
+        run: cargo test -p platform-windows --locked
+      - name: Test platform selection
+        run: cargo test -p platform-runtime --locked
+      - name: Test native messaging host
+        run: cargo test -p autologin-native-host --locked
+      - name: Test desktop commands
+        run: cargo test -p autologin-desktop --locked
       - name: Test frontend
         run: pnpm --dir app test --run
       - name: Build frontend

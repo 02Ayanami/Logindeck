@@ -78,6 +78,37 @@ async fn windows_application_round_trips_platform_and_aumid() {
     );
 }
 
+#[tokio::test]
+async fn application_update_round_trips_windows_platform_and_aumid() {
+    let repos = prepared_repositories().await;
+    let mut application = repos
+        .applications()
+        .insert(sample_application())
+        .await
+        .unwrap();
+    assert_eq!(application.platform, Platform::Macos);
+
+    application.platform = Platform::Windows;
+    application.platform_application_id = "Contoso.Chat_abc!App".into();
+    application.launch_target = "aumid:Contoso.Chat_abc!App".into();
+    application.path_access_ref = None;
+    repos
+        .applications()
+        .update(application.clone())
+        .await
+        .unwrap();
+
+    let reloaded = repos
+        .applications()
+        .get(application.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(reloaded.platform, Platform::Windows);
+    assert_eq!(reloaded.launch_target, "aumid:Contoso.Chat_abc!App");
+    assert_eq!(reloaded, application);
+}
+
 fn sample_account(application_id: ApplicationId) -> ApplicationAccount {
     ApplicationAccount {
         id: ApplicationAccountId::new(),

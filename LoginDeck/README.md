@@ -1,6 +1,6 @@
 # LoginDeck
 
-macOS 本地账号密码管理工具。提供独立的网站账号和应用账号页面：密码保存在登录钥匙串，账号元数据保存在本地 SQLite。
+macOS 与 Windows 本地账号密码管理工具。共用网站账号和应用账号页面；密码分别保存在 macOS 登录钥匙串或 Windows Credential Manager，账号元数据保存在本地 SQLite。Windows 基础平台已完成本机自动化验证与 debug 构建；实际验收边界见 [Windows 验证记录](docs/testing/2026-09-18-windows-foundation.md)。
 
 ## 当前功能
 
@@ -13,7 +13,11 @@ macOS 本地账号密码管理工具。提供独立的网站账号和应用账�
 
 当前产品不提供应用自动登录、自动填写、账号切换、短信登录、录制器或批量删除。
 
-## 安装 Edge 插件
+Windows 应用扫描合并 Win32 卸载注册信息和当前用户 MSIX/UWP 可启动应用，支持 `.exe` 手动导入、图标降级和启动前身份复核。身份材料是文件或包注册元数据，不是 Authenticode、发布者信任或文件内容认证；复核与进程创建也不是系统级原子事务。
+
+## 安装 Edge 插件（当前仅 macOS）
+
+Windows 构建包含共享资源，但尚未接入 Windows Edge 本机消息安装与网页登录捕获流程。
 
 在“网站账号”页点击“浏览器插件”，直接查看安装教程。LoginDeck 自动准备插件文件和本机连接组件，无需用户使用终端。
 
@@ -28,7 +32,7 @@ macOS 本地账号密码管理工具。提供独立的网站账号和应用账�
 
 ## 开发与验证
 
-需要 macOS、稳定版 Rust（桌面代码最低要求 1.89）、Node.js、pnpm 和 Xcode Command Line Tools。
+仓库工具链固定 Rust 1.89.0、pnpm 11.19.0；CI 使用 Node.js 22。macOS 开发还需要 Xcode Command Line Tools。
 
 ```sh
 cd app
@@ -39,24 +43,33 @@ pnpm desktop
 版本以 `app/package.json` 为唯一来源；`pnpm sync-version` 会同步 Tauri 配置和桌面 Cargo 包。
 常用入口为 `pnpm typecheck`、`pnpm build`、`pnpm preflight` 和 `pnpm tauri build`。
 
-仓库根目录的验证命令：
+macOS 仓库根目录的验证命令：
 
 ```sh
 ./scripts/verify-macos.sh
 ```
 
+Windows 支持目标为 Windows 10 22H2 / Windows 11 x64；当前本机证据来自 Windows 11，Windows 10 尚未实测。需要 64 位 PowerShell 5.1 或更新版、Rust 的 `x86_64-pc-windows-msvc` 工具链、Visual Studio 2022 Build Tools 的 C++ 桌面开发工具与 Windows SDK、WebView2 Runtime，以及 Node.js 22、Corepack 和可获取 pnpm 11.19.0 的网络环境。首次打包还需要下载 Tauri 的 WiX/NSIS 构建工具。
+
+从包含 `Cargo.toml` 的仓库目录运行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-windows.ps1
+```
+
+脚本也可通过绝对路径从任意目录调用。它执行 Rust 格式检查、固定版本前端安装、生成桌面测试所需资源、整个 Rust workspace/all-targets 串行测试、脚本回归、前端类型检查/测试/构建，以及完整 Tauri debug EXE、MSI 和 NSIS 构建。使用显式 Corepack 版本以避免外层目录的 pnpm 默认版本覆盖应用固定版本；原生命令失败立即停止并保留退出码。运行需要当前用户桌面会话，会使用测试专属凭据、注册表项和受控剪贴板写入。MSI/NSIS 仅构建，不执行安装。
+
 仓库采用共享核心加平台实现的单仓库结构：前端与 `autologin-core` 保持平台中立，
-`platform-runtime` 负责选择当前目标实现，现阶段接入 `platform-macos`。未来 Windows 版在
-Windows 电脑上完成实现与验证后，以新的平台 crate 接入同一仓库，不复制核心与前端。
+`platform-runtime` 按编译目标选择 `platform-macos` 或 `platform-windows`，不复制核心与前端。
 详见[仓库架构说明](docs/repository-architecture.md)。
 
 `app/preview.html` 是使用模拟数据和模拟本机命令的开发预览，不读取真实账号。预览中的连接灯不代表实际插件连接。
 
-桌面开发与构建前会运行 `scripts/prepare-edge-bundle.mjs`，准备 Edge 插件与本机组件资源。对外分发需要完整应用包，不能只分发桌面可执行文件。本轮不打包、不签名、不发布。
+桌面开发与构建前会运行 `scripts/prepare-edge-bundle.mjs`，准备 Edge 插件与本机组件资源。对外分发需要完整应用包，不能只分发桌面可执行文件。Windows 基础平台已构建本地 debug 安装包，尚未安装、签名或发布；Windows 自动登录、自动填写、账号切换和 UI Automation 均不在本阶段范围。
 
 ## 存储与恢复
 
-新密码使用 macOS 登录钥匙串保存。编辑时留空密码保留原值。正常复制密码后在 30 秒内按写入标记清理剪贴板；用户随后复制的其他内容会保留。强制退出或第三方剪贴板历史不在该清理保证内。
+新密码使用当前平台的系统凭据库保存。编辑时留空密码保留原值。正常复制密码后在 30 秒内按写入标记清理剪贴板；用户随后复制的其他内容会保留。Windows 使用剪贴板序列号与持锁复核。强制退出或第三方剪贴板历史不在该清理保证内。
 
 系统凭据库与 SQLite 是两个存储系统，使用持久化恢复记录处理操作中断。密码删除失败时保留账号元数据；启动及后续修改时会重试恢复。界面不提供维护面板。旧存储引用保留兼容处理，不自动迁移或丢弃。
 
@@ -66,5 +79,6 @@ Windows 电脑上完成实现与验证后，以新的平台 crate 接入同一�
 - [本轮收尾与验收汇总](docs/testing/2026-09-17-release-readiness.md)
 - [Edge 实机测试记录](docs/testing/2026-09-17-edge-live-redesign.md)
 - [代码审阅修复记录](docs/testing/2026-09-17-review-fixes.md)
+- [Windows 基础平台验证与未验证项](docs/testing/2026-09-18-windows-foundation.md)
 
 `adapters/`、`tools/adapter-builder/` 以及底层适配器、填写和切换实验属于历史研发内容，不作为当前产品入口或发布功能。`docs/superpowers/` 中的旧设计保留用于追溯，当前范围以产品设计文档为准。

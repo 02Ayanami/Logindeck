@@ -10,6 +10,7 @@ autologin-core = { path = "../autologin-core" }
 base64 = "0.22"
 png = "0.17.16"
 secrecy = "0.10"
+serde_json = "1"
 tokio = { version = "1", features = ["rt", "sync"] }
 uuid = { version = "1", features = ["v4"] }
 zeroize = "1"
@@ -44,7 +45,6 @@ windows = { version = "0.61.3", features = [
 ] }
 
 [dev-dependencies]
-serde_json = "1"
 syn = { version = "2", features = ["full"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 

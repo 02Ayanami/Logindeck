@@ -4,6 +4,7 @@ pub(crate) mod app_catalog;
 pub mod clipboard;
 pub mod credentials;
 mod data_directory;
+pub mod edge;
 pub mod error;
 mod icons;
 mod launch;

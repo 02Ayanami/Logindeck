@@ -1,0 +1,3 @@
+# SQLx embeds checksums of the exact migration bytes. Preserve historical LF
+# checksums across Windows and macOS checkouts, including core.autocrlf=true.
+/migrations/*.sql text eol=lf

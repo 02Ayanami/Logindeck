@@ -162,6 +162,55 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn startup_reopens_database_created_from_canonical_lf_migrations() {
+        let directory = std::env::temp_dir().join(format!("logindeck-startup-{}", Uuid::new_v4()));
+        std::fs::create_dir(&directory).unwrap();
+        let url = format!("sqlite://{}", directory.join("autologin.sqlite3").display());
+        let previous = SqliteRepositories::connect(&url).await.unwrap();
+        // Simulate a previous build from Git's canonical LF migration bytes.
+        let canonical = sqlx::migrate::Migrator {
+            migrations: std::borrow::Cow::Owned(
+                MIGRATOR
+                    .iter()
+                    .map(|migration| {
+                        sqlx::migrate::Migration::new(
+                            migration.version,
+                            migration.description.clone(),
+                            migration.migration_type,
+                            migration.sql.replace("\r\n", "\n").into(),
+                            migration.no_tx,
+                        )
+                    })
+                    .collect(),
+            ),
+            ..sqlx::migrate::Migrator::DEFAULT
+        };
+        canonical.run(&previous.state.pool).await.unwrap();
+        previous.settings().set_browser_capture(true).await.unwrap();
+        previous.state.pool.close().await;
+        drop(previous);
+
+        let reopened = SqliteRepositories::connect(&url).await.unwrap();
+        let startup = reopened.migrate().await;
+        // Keep SQLx's underlying cause visible in a failing test, never in a client error.
+        let diagnostic = if startup.is_err() {
+            Some(MIGRATOR.run(&reopened.state.pool).await)
+        } else {
+            None
+        };
+        let saved_setting = reopened.settings().browser_capture().await.unwrap();
+        reopened.state.pool.close().await;
+        drop(reopened);
+        std::fs::remove_dir_all(directory).unwrap();
+
+        assert!(
+            startup.is_ok(),
+            "startup: {startup:?}; SQLx: {diagnostic:?}"
+        );
+        assert!(saved_setting.enabled, "startup must preserve existing data");
+    }
+
+    #[tokio::test]
     async fn repository_handle_keeps_memory_database_alive_after_aggregate_drop() {
         let repos = SqliteRepositories::connect_with_aggressive_idle_timeout_for_test(
             "sqlite::memory:",

@@ -2,12 +2,11 @@
 
 ## Status
 
-Deferred after scope was narrowed in conversation on 2026-09-21. The current implementation restores
-the shared Settings navigation and page only; Windows native-messaging installation remains future
-work. This design is retained as that future parity proposal, not as the acceptance contract for the
-UI-only change.
+Approved for implementation in conversation on 2026-09-21 after the shared Settings page was
+restored. This phase implements Windows native-messaging installation and connection only; signing
+and public release packaging remain separate follow-up work.
 
-The proposal uses the currently installed macOS
+The design uses the currently installed macOS
 application as the product baseline: LoginDeck has a Settings destination anchored at the bottom of
 the sidebar, with Language and Edge login detection controls. A later source cleanup removed that
 destination; this work restores the macOS behavior and makes it functional on Windows rather than

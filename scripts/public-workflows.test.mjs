@@ -25,3 +25,21 @@ test("platform verification workflows are least-privilege and architecture-speci
   assert.match(macos, /arm64/);
   assert.match(macos, /verify-macos\.sh/);
 });
+
+test("release workflow publishes only after both native installers exist", async () => {
+  const release = await read(".github/workflows/release.yml");
+  assert.match(release, /tags: \["v\*"\]/);
+  assert.match(release, /check-release-version\.mjs/);
+  assert.match(release, /runs-on: windows-2022/);
+  assert.match(release, /runs-on: macos-14/);
+  assert.match(release, /tauri build --bundles nsis/);
+  assert.match(release, /tauri build --bundles dmg/);
+  assert.match(release, /needs: \[prepare, windows, macos\]/);
+  assert.match(release, /LoginDeck-\$\{\{ needs\.prepare\.outputs\.version \}\}-windows-x64-setup\.exe/);
+  assert.match(release, /LoginDeck-\$\{\{ needs\.prepare\.outputs\.version \}\}-macos-arm64\.dmg/);
+  assert.match(release, /SHA256SUMS\.txt/);
+
+  const writePermissions = release.match(/contents: write/g) ?? [];
+  assert.equal(writePermissions.length, 1);
+  assert.match(release, /release:[\s\S]*?permissions:\s*\n\s+contents: write/);
+});

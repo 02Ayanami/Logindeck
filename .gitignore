@@ -2,6 +2,7 @@
 .superpowers/
 
 target/
+release-assets*/
 
 *.autologin-draft
 *.autologin-lock

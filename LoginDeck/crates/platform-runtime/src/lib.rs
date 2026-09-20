@@ -9,8 +9,9 @@ compile_error!("LoginDeck supports only macOS and Windows platform runtimes");
 #[cfg(target_os = "macos")]
 mod selected {
     pub use platform_macos::{
-        application_icon, keychain_last_status as credential_last_status, MacApplicationCatalog,
-        MacClipboard, MacCredentialStore,
+        application_data_directory, application_icon,
+        keychain_last_status as credential_last_status, MacApplicationCatalog, MacClipboard,
+        MacCredentialStore,
     };
 
     pub type NativeApplicationCatalog = MacApplicationCatalog;
@@ -48,8 +49,9 @@ mod selected {
 #[cfg(target_os = "windows")]
 mod selected {
     pub use platform_windows::{
-        application_icon, application_icon_for_record, credential_last_status,
-        WindowsApplicationCatalog, WindowsClipboard, WindowsCredentialStore,
+        application_data_directory, application_icon, application_icon_for_record,
+        credential_last_status, WindowsApplicationCatalog, WindowsClipboard,
+        WindowsCredentialStore,
     };
 
     pub type NativeApplicationCatalog = WindowsApplicationCatalog;
@@ -81,3 +83,17 @@ mod selected {
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 pub use selected::*;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn application_data_directory_is_absolute_and_uses_fixed_identifier() {
+        let path = super::application_data_directory().expect("application data directory");
+
+        assert!(path.is_absolute());
+        assert_eq!(
+            path.file_name().and_then(|name| name.to_str()),
+            Some("com.autologin.desktop")
+        );
+    }
+}

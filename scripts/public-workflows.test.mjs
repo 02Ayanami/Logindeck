@@ -50,6 +50,7 @@ test("release workflow publishes only after both native installers exist", async
   assert.match(release, /LoginDeck-\$\{\{ needs\.prepare\.outputs\.version \}\}-windows-x64-setup\.exe/);
   assert.match(release, /LoginDeck-\$\{\{ needs\.prepare\.outputs\.version \}\}-macos-arm64\.dmg/);
   assert.match(release, /SHA256SUMS\.txt/);
+  assert.match(release, /GH_REPO: \$\{\{ github\.repository \}\}/);
 
   const writePermissions = release.match(/contents: write/g) ?? [];
   assert.equal(writePermissions.length, 1);

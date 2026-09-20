@@ -19,6 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Require Apple Silicon runner
+        run: |
+          architecture="$(uname -m)"
+          test "$architecture" = "arm64" || {
+            echo "Expected an Apple Silicon arm64 runner, got: $architecture" >&2
+            exit 1
+          }
+
       - uses: pnpm/action-setup@v4
         with:
           version: 11.19.0

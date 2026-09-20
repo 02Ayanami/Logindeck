@@ -1,6 +1,8 @@
 # LoginDeck
 
-macOS 与 Windows 本地账号密码管理工具。共用网站账号和应用账号页面；密码分别保存在 macOS 登录钥匙串或 Windows Credential Manager，账号元数据保存在本地 SQLite。Windows 基础平台已完成本机自动化验证与 debug 构建；实际验收边界见 [Windows 验证记录](docs/testing/2026-09-18-windows-foundation.md)。
+LoginDeck 是一个开源学习版的 macOS 与 Windows 本地账号密码管理工具。共用网站账号和应用账号页面；密码分别保存在 macOS 登录钥匙串或 Windows Credential Manager，账号元数据保存在本地 SQLite。
+
+支持 Windows x64 和 Apple Silicon（M 系列）macOS；不提供 Intel macOS 构建。GitHub Releases 中的学习版安装包未签名，Windows SmartScreen 或 macOS Gatekeeper 可能显示安全提醒。请只从本仓库的 Releases 下载，并自行判断是否运行。
 
 ## 当前功能
 
@@ -27,6 +29,8 @@ macOS 与 Windows 均由“设置 → Edge 登录识别”自动准备插件文�
 Windows 插件目录位于 `%APPDATA%\com.autologin.desktop\edge-extension`；macOS 目录以界面显示的实际路径为准。首次使用仍需在 Edge 开发人员模式中加载一次解压缩扩展；这不是扩展商店自动安装。更新插件文件后需在 Edge 重新加载插件，并刷新已打开的登录页。
 
 [中文使用说明](docs/help/edge-login-zh-CN.md) · [English guide](docs/help/edge-login-en.md)
+
+Edge 扩展不会由安装程序静默加入浏览器。首次使用必须由用户按软件内指南开启开发人员模式并选择“加载解压缩的扩展”（Load unpacked）。
 
 ## 开发与验证
 
@@ -72,6 +76,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-windows.ps1
 系统凭据库与 SQLite 是两个存储系统，使用持久化恢复记录处理操作中断。密码删除失败时保留账号元数据；启动及后续修改时会重试恢复。界面不提供维护面板。旧存储引用保留兼容处理，不自动迁移或丢弃。
 
 ## 范围与验收记录
+
+本项目采用 [MIT License](LICENSE)。提交修改前请阅读[贡献指南](CONTRIBUTING.md)；涉及安全或敏感数据的问题请按[安全策略](SECURITY.md)私下报告。
 
 - [已确认的产品设计](docs/product-redesign.md)
 - [本轮收尾与验收汇总](docs/testing/2026-09-17-release-readiness.md)

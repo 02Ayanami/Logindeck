@@ -23,7 +23,10 @@ test("platform verification workflows are least-privilege and architecture-speci
   assert.match(macos, /runs-on: macos-14/);
   assert.match(macos, /uname -m/);
   assert.match(macos, /arm64/);
-  assert.match(macos, /verify-macos\.sh/);
+  assert.match(macos, /cargo test --workspace --locked/);
+  assert.match(macos, /pnpm --dir app test --run/);
+  assert.match(macos, /node --test tests\/\*\.test\.mjs/);
+  assert.match(macos, /git diff --exit-code/);
 });
 
 test("release workflow publishes only after both native installers exist", async () => {

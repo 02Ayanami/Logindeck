@@ -41,20 +41,20 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Prepare pinned package manager
-        run: |
-          npm install --global corepack@0.35.0
-          corepack enable
-          corepack prepare pnpm@11.19.0 --activate
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.89.0
       - uses: Swatinem/rust-cache@v2
-      - run: corepack pnpm@11.19.0 --dir app install --frozen-lockfile
-      - run: corepack pnpm@11.19.0 --dir app tauri build --bundles nsis
+      - run: pnpm --dir app install --frozen-lockfile
+      - run: pnpm --dir app tauri build --bundles nsis
       - name: Collect the Windows x64 installer
         run: node scripts/collect-release-assets.mjs windows "${{ needs.prepare.outputs.version }}" target/release/bundle/nsis release-assets
       - uses: actions/upload-artifact@v4

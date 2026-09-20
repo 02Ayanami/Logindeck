@@ -22,28 +22,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Prepare pinned package manager
-        id: pnpm
-        run: |
-          npm install --global corepack@0.35.0
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          corepack enable
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          corepack prepare pnpm@11.19.0 --activate
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $store = corepack pnpm@11.19.0 --dir app store path --silent
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          "store=$store" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm.outputs.store }}
-          key: windows-pnpm-11.19.0-${{ hashFiles('app/pnpm-lock.yaml') }}
-          restore-keys: windows-pnpm-11.19.0-
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
 
       - uses: dtolnay/rust-toolchain@master
         with:

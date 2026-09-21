@@ -309,6 +309,7 @@ mod tests {
         let path = root.join("Fixture.exe");
         std::fs::write(&path, b"controlled inert fixture").unwrap();
         let exe = win32::filesystem::executable(path.to_str().unwrap()).unwrap();
+        let canonical_path = exe.path.clone();
         let mut app = ApplicationRecord::new(
             Platform::Windows,
             win32::identity_key("manual", &exe.path),
@@ -319,7 +320,7 @@ mod tests {
         app.signature_identity = exe.fingerprint;
         app.discovery_source = DiscoverySource::ManualImport;
         let pid = native::verified_file_with(&app, &path, true, |canonical| {
-            assert_eq!(win32::path_key(canonical), win32::path_key(&path));
+            assert_eq!(win32::path_key(canonical), win32::path_key(&canonical_path));
             assert!(std::fs::OpenOptions::new().write(true).open(&path).is_err());
             assert!(std::fs::rename(&path, root.join("replacement.exe")).is_err());
             Ok(417)

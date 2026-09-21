@@ -452,7 +452,12 @@ mod native {
                 let actual = load(&path, "user-programs:Chat.lnk", &NativePathProbe);
                 assert_eq!(actual.is_some(), expected);
                 if let Some(actual) = actual {
-                    assert_eq!(actual.target, target);
+                    let canonical = fs::canonicalize(&target).unwrap();
+                    let canonical = canonical.to_str().unwrap();
+                    assert_eq!(
+                        actual.target,
+                        Path::new(canonical.strip_prefix(r"\\?\").unwrap_or(canonical))
+                    );
                 }
                 // The loader and COM object released their handles.
                 fs::remove_file(&path).unwrap();

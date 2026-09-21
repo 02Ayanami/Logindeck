@@ -662,9 +662,12 @@ mod tests {
             tree.file("ChatUpdater.exe");
             tree.file("notes.txt");
             let direct = import_path(&path).unwrap();
+            let canonical = fs::canonicalize(&path).unwrap();
+            let canonical = canonical.to_str().unwrap();
+            let canonical = canonical.strip_prefix(r"\\?\").unwrap_or(canonical);
             assert_eq!(direct.discovery_source, DiscoverySource::ManualImport);
             assert_eq!(direct.platform, Platform::Windows);
-            assert_eq!(direct.launch_target, format!("exe:{}", path.display()));
+            assert_eq!(direct.launch_target, format!("exe:{canonical}"));
             assert_eq!(direct.display_name, "Chat");
             assert!(direct.signature_identity.starts_with("winfile-v1:"));
             assert_eq!(direct, import_path(&tree.0).unwrap());
@@ -672,9 +675,12 @@ mod tests {
             fs::create_dir(&nested).unwrap();
             let moved = nested.join("Chat.exe");
             fs::rename(&path, &moved).unwrap();
+            let canonical = fs::canonicalize(&moved).unwrap();
+            let canonical = canonical.to_str().unwrap();
+            let canonical = canonical.strip_prefix(r"\\?\").unwrap_or(canonical);
             assert_eq!(
                 import_path(&tree.0).unwrap().launch_target,
-                format!("exe:{}", moved.display())
+                format!("exe:{canonical}")
             );
         }
 

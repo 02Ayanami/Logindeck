@@ -1553,6 +1553,12 @@ mod tests {
         use super::*;
         use std::fs;
 
+        fn canonical(path: &Path) -> PathBuf {
+            let canonical = fs::canonicalize(path).unwrap();
+            let canonical = canonical.to_str().unwrap();
+            canonical.strip_prefix(r"\\?\").unwrap_or(canonical).into()
+        }
+
         struct Tree(PathBuf);
         impl Tree {
             fn new() -> Self {
@@ -1580,7 +1586,7 @@ mod tests {
             let path = tree.file("chat.exe");
             let probe = NativePathProbe;
             let first = probe.executable(path.to_str().unwrap()).unwrap();
-            assert_eq!(first.path, path);
+            assert_eq!(first.path, canonical(&path));
             assert_eq!(
                 first.fingerprint,
                 probe
@@ -1615,10 +1621,16 @@ mod tests {
             let chat = tree.file("bin/chat.exe");
             tree.file("unins000.exe");
             let probe = NativePathProbe;
-            assert_eq!(probe.scan_install(&tree.0, "Chat").unwrap().path, chat);
+            assert_eq!(
+                probe.scan_install(&tree.0, "Chat").unwrap().path,
+                canonical(&chat)
+            );
             tree.file("other.exe");
             assert!(probe.scan_install(&tree.0, "Unknown").is_none());
-            assert_eq!(probe.scan_install(&tree.0, "Chat").unwrap().path, chat);
+            assert_eq!(
+                probe.scan_install(&tree.0, "Chat").unwrap().path,
+                canonical(&chat)
+            );
             assert!(probe.scan_install(Path::new(r"C:\"), "Chat").is_none());
             let deep = Tree::new();
             deep.file("a/b/c/deep.exe");

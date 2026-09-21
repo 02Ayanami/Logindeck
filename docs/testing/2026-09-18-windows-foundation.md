@@ -45,7 +45,7 @@ preserves its exit code. PowerShell errors return nonzero. Its actual sequence i
 1. `cargo fmt --all -- --check`
 2. `corepack pnpm@11.19.0 --dir app install --frozen-lockfile`
 3. `node scripts/prepare-edge-bundle.mjs` (ignored resources required by fresh-checkout desktop tests)
-4. package-by-package `cargo test --locked -p <workspace-member> --all-targets -- --test-threads=1`
+4. package-by-package serial Rust tests, with the `platform-windows` library and each native integration target reported separately
 5. `node --test scripts/bundle-native-host.test.mjs scripts/tauri.test.mjs scripts/verify-windows.test.mjs`
 6. `corepack pnpm@11.19.0 --dir app typecheck`
 7. `corepack pnpm@11.19.0 --dir app test -- --run`

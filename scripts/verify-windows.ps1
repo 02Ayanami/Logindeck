@@ -52,13 +52,27 @@ try {
     foreach ($rustPackage in @(
         'autologin-core',
         'platform-macos',
-        'platform-windows',
         'platform-runtime',
         'autologin-native-host',
         'autologin-desktop'
     )) {
         $verificationStage = "Rust tests: $rustPackage"
         Invoke-CheckedNative 'cargo' @('test', '--locked', '-p', $rustPackage, '--all-targets', '--', '--test-threads=1')
+    }
+    # Keep every Windows-native test binary separate. Besides making the public annotation useful,
+    # this prevents a failure in one desktop integration from hiding the remaining test boundary.
+    $verificationStage = 'Rust tests: platform-windows library'
+    Invoke-CheckedNative 'cargo' @('test', '--locked', '-p', 'platform-windows', '--lib', '--', '--test-threads=1')
+    foreach ($testTarget in @(
+        'catalog_native',
+        'clipboard_native',
+        'credentials_native',
+        'edge_install',
+        'launch_native',
+        'test_boundaries'
+    )) {
+        $verificationStage = "Rust tests: platform-windows/$testTarget"
+        Invoke-CheckedNative 'cargo' @('test', '--locked', '-p', 'platform-windows', '--test', $testTarget, '--', '--test-threads=1')
     }
     $verificationStage = 'script regression tests'
     Invoke-CheckedNative 'node' @('--test', 'scripts/bundle-native-host.test.mjs', 'scripts/tauri.test.mjs', 'scripts/verify-windows.test.mjs')

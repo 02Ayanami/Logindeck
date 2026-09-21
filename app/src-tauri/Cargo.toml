@@ -1,6 +1,6 @@
 [package]
 name = "autologin-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "LoginDeck desktop application"
 authors = ["LoginDeck"]
 edition = "2021"

@@ -27,6 +27,7 @@ function Invoke-CheckedNative {
 }
 
 $verificationExit = 1
+$verificationStage = 'host validation'
 $locationPushed = $false
 try {
     Assert-WindowsX64
@@ -38,17 +39,26 @@ try {
         throw 'app/package.json must pin an exact pnpm version.'
     }
 
+    $verificationStage = 'Rust formatting'
     Invoke-CheckedNative 'cargo' @('fmt', '--all', '--', '--check')
     # Explicit Corepack selection also works when the outer directory defaults to another pnpm.
+    $verificationStage = 'frontend dependency installation'
     Invoke-CheckedNative 'corepack' @($packageManager, '--dir', 'app', 'install', '--frozen-lockfile')
     # Tauri tests need these ignored resources even on a fresh checkout.
+    $verificationStage = 'Edge resource preparation'
     Invoke-CheckedNative 'node' @('scripts/prepare-edge-bundle.mjs')
     # Native fixtures share the current user's desktop, clipboard and registry session.
+    $verificationStage = 'Rust workspace tests'
     Invoke-CheckedNative 'cargo' @('test', '--locked', '--workspace', '--all-targets', '--', '--test-threads=1')
+    $verificationStage = 'script regression tests'
     Invoke-CheckedNative 'node' @('--test', 'scripts/bundle-native-host.test.mjs', 'scripts/tauri.test.mjs', 'scripts/verify-windows.test.mjs')
+    $verificationStage = 'frontend type checking'
     Invoke-CheckedNative 'corepack' @($packageManager, '--dir', 'app', 'typecheck')
+    $verificationStage = 'frontend tests'
     Invoke-CheckedNative 'corepack' @($packageManager, '--dir', 'app', 'test', '--', '--run')
+    $verificationStage = 'frontend production build'
     Invoke-CheckedNative 'corepack' @($packageManager, '--dir', 'app', 'build')
+    $verificationStage = 'Tauri debug bundle build'
     Invoke-CheckedNative 'corepack' @($packageManager, '--dir', 'app', 'tauri', 'build', '--debug')
     $verificationExit = 0
     Write-Host 'Windows foundation verification passed. Bundles were built, not installed.'
@@ -56,6 +66,10 @@ try {
 catch {
     if ($_.Exception.Data.Contains('ExitCode')) {
         $verificationExit = [int]$_.Exception.Data['ExitCode']
+    }
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+        $safeMessage = $_.Exception.Message.Replace("`r", ' ').Replace("`n", ' ').Replace('%', '%25')
+        Write-Host "::error title=Windows verification failed::$verificationStage - $safeMessage"
     }
     Write-Error -Message $_.Exception.Message -ErrorAction Continue
 }

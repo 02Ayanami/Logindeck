@@ -15,6 +15,7 @@ test("platform verification workflows are least-privilege and architecture-speci
     assert.match(workflow, /push:\s*\n\s+branches: \[main\]/);
     assert.match(workflow, /permissions:\s*\n\s+contents: read/);
     assert.doesNotMatch(workflow, /contents: write/);
+    assert.doesNotMatch(workflow, /uses:\s+[^\s@]+@(?:master|main|v\d+)\b/);
   }
 
   assert.match(windows, /runs-on: windows-2022/);
@@ -36,6 +37,10 @@ test("platform verification workflows are least-privilege and architecture-speci
   assert.match(macos, /pnpm --dir app test --run/);
   assert.match(macos, /node --test tests\/\*\.test\.mjs/);
   assert.match(macos, /git diff --exit-code/);
+  assert.ok(
+    macos.indexOf("node scripts/prepare-edge-bundle.mjs") < macos.indexOf("cargo test -p autologin-desktop --locked"),
+    "desktop tests require generated Edge resources on a clean checkout",
+  );
 });
 
 test("release workflow publishes only after both native installers exist", async () => {
@@ -51,6 +56,7 @@ test("release workflow publishes only after both native installers exist", async
   assert.match(release, /LoginDeck-\$\{\{ needs\.prepare\.outputs\.version \}\}-macos-arm64\.dmg/);
   assert.match(release, /SHA256SUMS\.txt/);
   assert.match(release, /GH_REPO: \$\{\{ github\.repository \}\}/);
+  assert.doesNotMatch(release, /uses:\s+[^\s@]+@(?:master|main|v\d+)\b/);
 
   const writePermissions = release.match(/contents: write/g) ?? [];
   assert.equal(writePermissions.length, 1);

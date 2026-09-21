@@ -24,12 +24,12 @@ if (process.platform !== 'darwin') {
 
 run('Sync versions', 'pnpm', ['sync-version'], app);
 run('Rust format', cargo, ['fmt', '--all', '--', '--check']);
+run('macOS resource bundle', 'node', ['scripts/prepare-edge-bundle.mjs']);
 run('Rust tests', cargo, ['test', '--workspace', '--locked']);
 run('Frontend tests', 'pnpm', ['test', '--run'], app);
 run('Frontend build', 'pnpm', ['build'], app);
 run('Edge extension tests', 'node', ['--test', 'tests/*.test.mjs'], path.join(root, 'browser-extension'));
 run('Edge extension build', 'node', ['build.mjs'], path.join(root, 'browser-extension'));
-run('macOS resource bundle', 'node', ['scripts/prepare-edge-bundle.mjs']);
 run('Diff check', 'git', ['diff', '--check']);
 
 console.log('\n[OK] LoginDeck macOS preflight completed.');

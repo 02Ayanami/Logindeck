@@ -2,7 +2,7 @@
 
 LoginDeck 是一个开源学习版的 macOS 与 Windows 本地账号密码管理工具。共用网站账号和应用账号页面；密码分别保存在 macOS 登录钥匙串或 Windows Credential Manager，账号元数据保存在本地 SQLite。
 
-支持 Windows x64 和 Apple Silicon（M 系列）macOS；不提供 Intel macOS 构建。GitHub Releases 中的学习版安装包未签名，Windows SmartScreen 或 macOS Gatekeeper 可能显示安全提醒。请只从本仓库的 Releases 下载，并自行判断是否运行。
+支持 Windows x64 和 Apple Silicon（M 系列）macOS；不提供 Intel macOS 构建。GitHub Releases 页面提供的学习版安装包未签名，Windows SmartScreen 或 macOS Gatekeeper 可能显示安全提醒。下载前请确认发布页同时包含 Windows 安装包、macOS 安装包和 `SHA256SUMS.txt`，并自行判断是否运行。
 
 ## 当前功能
 
@@ -67,7 +67,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-windows.ps1
 
 `app/preview.html` 是使用模拟数据和模拟本机命令的开发预览，不读取真实账号。预览中的连接灯不代表实际插件连接。
 
-桌面开发与构建前会运行 `scripts/prepare-edge-bundle.mjs`，准备 Edge 插件与本机组件资源。对外分发需要完整应用包，不能只分发桌面可执行文件。Windows 支持当前用户 Edge 本机消息注册，但安装包尚未签名或发布，也不代表扩展商店发布；Windows 自动登录、自动填写、账号切换和 UI Automation 均不在本阶段范围。
+桌面开发与构建前会运行 `scripts/prepare-edge-bundle.mjs`，准备 Edge 插件与本机组件资源。对外分发需要完整应用包，不能只分发桌面可执行文件。Windows 支持当前用户 Edge 本机消息注册；安装包未签名，Edge 扩展也未在扩展商店发布。Windows 自动登录、自动填写、账号切换和 UI Automation 均不在本阶段范围。
 
 ## 存储与恢复
 
@@ -83,6 +83,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-windows.ps1
 - [本轮收尾与验收汇总](docs/testing/2026-09-17-release-readiness.md)
 - [Edge 实机测试记录](docs/testing/2026-09-17-edge-live-redesign.md)
 - [代码审阅修复记录](docs/testing/2026-09-17-review-fixes.md)
-- [Windows 基础平台验证与未验证项](docs/testing/2026-09-18-windows-foundation.md)
+- [Windows 基础平台历史验证记录与未验证项](docs/testing/2026-09-18-windows-foundation.md)
 
 `adapters/`、`tools/adapter-builder/` 以及底层适配器、填写和切换实验属于历史研发内容，不作为当前产品入口或发布功能。`docs/superpowers/` 中的旧设计保留用于追溯，当前范围以产品设计文档为准。

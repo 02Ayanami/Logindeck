@@ -4,6 +4,11 @@ Evidence date: 2026-09-20, Asia/Hong_Kong (+08:00). This records the implemented
 not release approval or full native UI acceptance. The approved design is
 [Windows foundation](../superpowers/specs/2026-09-18-windows-foundation-design.md).
 
+> Historical milestone record: repository layout, Edge integration, hosted CI and release status
+> changed after this evidence was captured. Use the root README and current GitHub Actions runs for
+> present-day release instructions and status; the observations below remain the dated acceptance
+> evidence for the Windows foundation milestone.
+
 ## Host and tools
 
 | Item | Observed value |

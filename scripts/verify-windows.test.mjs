@@ -65,7 +65,16 @@ const expectedCalls = [
     'autologin-native-host',
     'autologin-desktop',
   ].map((name) => ['cargo', 'test', '--locked', '-p', name, '--all-targets', '--', '--test-threads=1']),
-  ['cargo', 'test', '--locked', '-p', 'platform-windows', '--lib', '--', '--test-threads=1'],
+  ...[
+    'app_catalog::',
+    'clipboard::',
+    'credentials::',
+    'data_directory::',
+    'error::',
+    'icons::',
+    'launch::',
+    'target::',
+  ].map((name) => ['cargo', 'test', '--locked', '-p', 'platform-windows', '--lib', name, '--', '--test-threads=1']),
   ...[
     'catalog_native',
     'clipboard_native',

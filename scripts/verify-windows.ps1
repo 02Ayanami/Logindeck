@@ -61,8 +61,19 @@ try {
     }
     # Keep every Windows-native test binary separate. Besides making the public annotation useful,
     # this prevents a failure in one desktop integration from hiding the remaining test boundary.
-    $verificationStage = 'Rust tests: platform-windows library'
-    Invoke-CheckedNative 'cargo' @('test', '--locked', '-p', 'platform-windows', '--lib', '--', '--test-threads=1')
+    foreach ($testModule in @(
+        'app_catalog::',
+        'clipboard::',
+        'credentials::',
+        'data_directory::',
+        'error::',
+        'icons::',
+        'launch::',
+        'target::'
+    )) {
+        $verificationStage = "Rust tests: platform-windows/$testModule"
+        Invoke-CheckedNative 'cargo' @('test', '--locked', '-p', 'platform-windows', '--lib', $testModule, '--', '--test-threads=1')
+    }
     foreach ($testTarget in @(
         'catalog_native',
         'clipboard_native',

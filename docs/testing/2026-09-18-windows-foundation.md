@@ -45,7 +45,7 @@ preserves its exit code. PowerShell errors return nonzero. Its actual sequence i
 1. `cargo fmt --all -- --check`
 2. `corepack pnpm@11.19.0 --dir app install --frozen-lockfile`
 3. `node scripts/prepare-edge-bundle.mjs` (ignored resources required by fresh-checkout desktop tests)
-4. `cargo test --locked --workspace --all-targets -- --test-threads=1`
+4. package-by-package `cargo test --locked -p <workspace-member> --all-targets -- --test-threads=1`
 5. `node --test scripts/bundle-native-host.test.mjs scripts/tauri.test.mjs scripts/verify-windows.test.mjs`
 6. `corepack pnpm@11.19.0 --dir app typecheck`
 7. `corepack pnpm@11.19.0 --dir app test -- --run`
@@ -108,8 +108,8 @@ The verifier tests were written first: all 3 failed with ENOENT for the absent s
 passed after implementation. They execute the real script from an unrelated cwd, copy it under a
 path with spaces, an ampersand and an apostrophe, and substitute real tiny Node child processes for
 expensive native build commands. They verify the entire command sequence, exact pinned invocation,
-resource preparation before workspace tests, successful stderr diagnostics, every one of the nine
-stage failures stopping immediately with exit 37, and caller-directory restoration. The real host
+resource preparation before workspace tests, successful stderr diagnostics, every verification
+stage failure stopping immediately with exit 37, and caller-directory restoration. The real host
 guard is separately executed with Windows x64, Unix, x86 and ARM64/x64-emulation inputs; unsupported
 cases reject without adding a production host-bypass option.
 

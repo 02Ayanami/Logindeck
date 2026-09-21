@@ -54,26 +54,35 @@ function fixture(t, failAt) {
   return { result, calls, root, caller };
 }
 
+const expectedCalls = [
+  ['cargo', 'fmt', '--all', '--', '--check'],
+  ['corepack', 'pnpm@11.19.0', '--dir', 'app', 'install', '--frozen-lockfile'],
+  ['node', 'scripts/prepare-edge-bundle.mjs'],
+  ...[
+    'autologin-core',
+    'platform-macos',
+    'platform-windows',
+    'platform-runtime',
+    'autologin-native-host',
+    'autologin-desktop',
+  ].map((name) => ['cargo', 'test', '--locked', '-p', name, '--all-targets', '--', '--test-threads=1']),
+  ['node', '--test', 'scripts/bundle-native-host.test.mjs', 'scripts/tauri.test.mjs', 'scripts/verify-windows.test.mjs'],
+  ['corepack', 'pnpm@11.19.0', '--dir', 'app', 'typecheck'],
+  ['corepack', 'pnpm@11.19.0', '--dir', 'app', 'test', '--', '--run'],
+  ['corepack', 'pnpm@11.19.0', '--dir', 'app', 'build'],
+  ['corepack', 'pnpm@11.19.0', '--dir', 'app', 'tauri', 'build', '--debug'],
+];
+
 test('Windows verifier resolves its own root, uses the package pin and prepares clean-checkout resources', { skip: !windows }, (t) => {
   const { result, calls, root, caller } = fixture(t);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.ok(calls.every((call) => call.cwd === root), JSON.stringify(calls));
-  assert.deepEqual(calls.map(({ tool, args }) => [tool, ...args]), [
-    ['cargo', 'fmt', '--all', '--', '--check'],
-    ['corepack', 'pnpm@11.19.0', '--dir', 'app', 'install', '--frozen-lockfile'],
-    ['node', 'scripts/prepare-edge-bundle.mjs'],
-    ['cargo', 'test', '--locked', '--workspace', '--all-targets', '--', '--test-threads=1'],
-    ['node', '--test', 'scripts/bundle-native-host.test.mjs', 'scripts/tauri.test.mjs', 'scripts/verify-windows.test.mjs'],
-    ['corepack', 'pnpm@11.19.0', '--dir', 'app', 'typecheck'],
-    ['corepack', 'pnpm@11.19.0', '--dir', 'app', 'test', '--', '--run'],
-    ['corepack', 'pnpm@11.19.0', '--dir', 'app', 'build'],
-    ['corepack', 'pnpm@11.19.0', '--dir', 'app', 'tauri', 'build', '--debug'],
-  ]);
+  assert.deepEqual(calls.map(({ tool, args }) => [tool, ...args]), expectedCalls);
   assert.ok(result.stdout.includes(`caller-cwd:${caller}`), result.stdout);
 });
 
 test('Windows verifier stops at each failed native stage and preserves its exit code', { skip: !windows }, (t) => {
-  for (let stage = 1; stage <= 9; stage += 1) {
+  for (let stage = 1; stage <= expectedCalls.length; stage += 1) {
     const { result, calls, caller } = fixture(t, stage);
     assert.equal(result.status, 37, `stage ${stage}: ${result.stdout}\n${result.stderr}`);
     assert.equal(calls.length, stage);

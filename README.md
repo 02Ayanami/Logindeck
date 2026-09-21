@@ -59,7 +59,7 @@ Windows 支持目标为 Windows 10 22H2 / Windows 11 x64；当前本机证据来
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-windows.ps1
 ```
 
-脚本也可通过绝对路径从任意目录调用。它执行 Rust 格式检查、固定版本前端安装、生成桌面测试所需资源、整个 Rust workspace/all-targets 串行测试、脚本回归、前端类型检查/测试/构建，以及完整 Tauri debug EXE、MSI 和 NSIS 构建。使用显式 Corepack 版本以避免外层目录的 pnpm 默认版本覆盖应用固定版本；原生命令失败立即停止并保留退出码。运行需要当前用户桌面会话，会使用测试专属凭据、注册表项和受控剪贴板写入。MSI/NSIS 仅构建，不执行安装。
+脚本也可通过绝对路径从任意目录调用。它执行 Rust 格式检查、固定版本前端安装、生成桌面测试所需资源、覆盖整个 Rust workspace 的逐包 all-targets 串行测试、脚本回归、前端类型检查/测试/构建，以及完整 Tauri debug EXE、MSI 和 NSIS 构建。使用显式 Corepack 版本以避免外层目录的 pnpm 默认版本覆盖应用固定版本；原生命令失败立即停止并保留退出码。运行需要当前用户桌面会话，会使用测试专属凭据、注册表项和受控剪贴板写入。MSI/NSIS 仅构建，不执行安装。
 
 仓库采用共享核心加平台实现的单仓库结构：前端与 `autologin-core` 保持平台中立，
 `platform-runtime` 按编译目标选择 `platform-macos` 或 `platform-windows`，不复制核心与前端。

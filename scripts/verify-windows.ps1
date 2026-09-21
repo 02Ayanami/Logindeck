@@ -47,9 +47,19 @@ try {
     # Tauri tests need these ignored resources even on a fresh checkout.
     $verificationStage = 'Edge resource preparation'
     Invoke-CheckedNative 'node' @('scripts/prepare-edge-bundle.mjs')
-    # Native fixtures share the current user's desktop, clipboard and registry session.
-    $verificationStage = 'Rust workspace tests'
-    Invoke-CheckedNative 'cargo' @('test', '--locked', '--workspace', '--all-targets', '--', '--test-threads=1')
+    # Native fixtures share the current user's desktop, clipboard and registry session. Keep each
+    # package visible as its own CI stage so a hosted-run failure is actionable without private logs.
+    foreach ($rustPackage in @(
+        'autologin-core',
+        'platform-macos',
+        'platform-windows',
+        'platform-runtime',
+        'autologin-native-host',
+        'autologin-desktop'
+    )) {
+        $verificationStage = "Rust tests: $rustPackage"
+        Invoke-CheckedNative 'cargo' @('test', '--locked', '-p', $rustPackage, '--all-targets', '--', '--test-threads=1')
+    }
     $verificationStage = 'script regression tests'
     Invoke-CheckedNative 'node' @('--test', 'scripts/bundle-native-host.test.mjs', 'scripts/tauri.test.mjs', 'scripts/verify-windows.test.mjs')
     $verificationStage = 'frontend type checking'

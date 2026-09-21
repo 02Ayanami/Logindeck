@@ -24,6 +24,9 @@ describe('desktop development configuration', () => {
   it('keeps every desktop version source synchronized', () => {
     expect(tauriConfig.version).toBe(packageJson.version);
     expect(cargoManifest).toMatch(new RegExp(`^version = "${packageJson.version.replaceAll('.', '\\.')}"$`, 'm'));
-    expect(cargoLock).toContain(`[[package]]\nname = "autologin-desktop"\nversion = "${packageJson.version}"\n`);
+    const escapedVersion = packageJson.version.replaceAll('.', '\\.');
+    expect(cargoLock).toMatch(
+      new RegExp(`\\[\\[package\\]\\]\\r?\\nname = "autologin-desktop"\\r?\\nversion = "${escapedVersion}"\\r?\\n`),
+    );
   });
 });

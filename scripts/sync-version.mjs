@@ -31,7 +31,7 @@ if (match[0] !== next) {
 }
 
 let cargoLock = await readFile(cargoLockPath, 'utf8');
-const lockPattern = /(\[\[package\]\]\nname = "autologin-desktop"\nversion = ")[^"]+("\n)/;
+const lockPattern = /(\[\[package\]\]\r?\nname = "autologin-desktop"\r?\nversion = ")[^"]+("\r?\n)/;
 const lockMatch = cargoLock.match(lockPattern);
 if (!lockMatch) throw new Error(`Missing autologin-desktop package in ${cargoLockPath}`);
 const nextLock = `${lockMatch[1]}${version}${lockMatch[2]}`;

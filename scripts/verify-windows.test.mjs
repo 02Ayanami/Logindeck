@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -51,7 +51,7 @@ function fixture(t, failAt) {
     exit $result
   `, { cwd: caller, env: { ...process.env, VERIFY_TRACE: trace, VERIFY_FAIL_AT: String(failAt ?? 0) } });
   const calls = readFileSync(trace, 'utf8').trim().split('\n').map(JSON.parse);
-  return { result, calls, root, caller };
+  return { result, calls, root: realpathSync.native(root), caller: realpathSync.native(caller) };
 }
 
 const expectedCalls = [
